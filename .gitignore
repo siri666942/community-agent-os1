@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.DS_Store
+.mimocode/
+
+# 真实用户数据与运行产物不入库(家长群聊/工单/名单含个人信息)
+knowledge/
+output/
+logs/
+hub/
