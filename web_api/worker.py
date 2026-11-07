@@ -21,11 +21,7 @@ def execute(kind, data):
                 customer_id = 'inbound-' + uuid.uuid4().hex[:12]
                 with db:
                     db.execute('INSERT INTO customers VALUES (?,?,?,?,?)',
-<<<<<<< HEAD
-                               (customer_id, '未确认', 0, 0, '入站消息'))
-=======
                                (customer_id, '未确认', 0, 0, '模拟入站消息' if data.get('demo') is True else '入站消息'))
->>>>>>> 63625db7de08473c3560290102df65491798ed49
             return workflow.inbound(db, customer_id, message)
     if kind == 'sop':
         day = data.get('day', '').strip()
@@ -37,14 +33,11 @@ def execute(kind, data):
             workflow.seed_demo(db)
             return {'status': '已导入模拟数据'}
         if kind == 'workflow-plan': return workflow.plan(db)
-<<<<<<< HEAD
-=======
         if kind == 'workflow-plan-content':
             result = workflow.plan(db)
             if any(t['status'] == 'WAITING_CONTENT' for t in result['tasks']):
                 result['content'] = workflow.create_content(db, result['batch_id'])
             return result
->>>>>>> 63625db7de08473c3560290102df65491798ed49
         if kind == 'workflow-content': return workflow.create_content(db, data['batch_id'])
         if kind == 'workflow-approve':
             if data.get('decision') not in ('APPROVED', 'REJECTED'):

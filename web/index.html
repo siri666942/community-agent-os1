@@ -1,46 +1,329 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-<<<<<<< HEAD
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#091218">
-  <title>伴学管家 OPC · Mission Control</title>
-  <link rel="stylesheet" href="/styles.css">
-  <script src="/app.js" defer></script>
+  <meta name="description" content="私域合伙人 - 基于公司 SOP 的私域智能运营前端原型">
+  <title>私域合伙人 · 智能运营工作台</title>
+  <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <div class="shell">
-    <aside class="sidebar">
-      <div class="brand"><span class="brand-mark">✳</span><div><strong>伴学管家 <em>OPC</em></strong><small>MISSION CONTROL</small></div></div>
-      <div class="side-label">WORKSPACE <span>01</span></div>
-      <nav aria-label="主导航">
-        <button class="nav active" data-page="dashboard"><span>◫</span>总览指挥舱 <b>⌘ 1</b></button>
-        <button class="nav" data-page="workspace"><span>◎</span>Agent 工作台 <b>⌘ 2</b></button>
-        <button class="nav" data-page="growth"><span>↻</span>增长协作 <b>⌘ 3</b></button>
-        <button class="nav" data-page="operations"><span>▦</span>运营中心 <b>⌘ 3</b></button>
-        <button class="nav" data-page="risk"><span>◇</span>风控与审批 <b>⌘ 4</b></button>
-        <button class="nav" data-page="analytics"><span>▥</span>经营分析 <b>⌘ 5</b></button>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <div class="brand">
+        <img src="./assets/brand-mark.png" alt="私域合伙人标志">
+        <div>
+          <strong>私域合伙人</strong>
+          <span>DomainMate</span>
+        </div>
+      </div>
+
+      <nav class="nav-list">
+        <button class="nav-item active" data-page="workspace"><i data-lucide="layout-dashboard"></i><span>运营工作台</span></button>
+        <button class="nav-item" data-page="chat"><i data-lucide="messages-square"></i><span>客户对话</span><em>2</em></button>
+        <button class="nav-item" data-page="profile"><i data-lucide="contact-round"></i><span>用户画像</span></button>
+        <button class="nav-item" data-page="sop"><i data-lucide="workflow"></i><span>SOP 流程</span></button>
+        <button class="nav-item" data-page="quality"><i data-lucide="shield-check"></i><span>话术与质检</span></button>
+        <button class="nav-item" data-page="simulator"><i data-lucide="monitor-smartphone"></i><span>客户端模拟</span></button>
       </nav>
-      <div class="side-footer"><div class="pulse"></div><div><strong>本地工作空间</strong><small>人工决策 · 安全交付</small></div><span>↗</span></div>
+
+      <div class="sidebar-agents">
+        <div class="section-kicker">AGENT 编排</div>
+        <div class="agent-mini">
+          <div class="agent-avatar service">服</div>
+          <div><strong>服务运营智能体</strong><span>客服 · 质检 · SOP 运营</span></div>
+          <span class="live-dot" title="在线"></span>
+        </div>
+        <div class="agent-mini">
+          <div class="agent-avatar growth">增</div>
+          <div><strong>增长分析智能体</strong><span>画像 · 分层 · 跟进</span></div>
+          <span class="live-dot" title="在线"></span>
+        </div>
+      </div>
+
+      <div class="sidebar-foot">
+        <button class="icon-button" title="系统设置"><i data-lucide="settings"></i></button>
+        <div class="operator-avatar">林</div>
+        <div><strong>林老师</strong><span>运营负责人</span></div>
+      </div>
     </aside>
-    <main class="main">
-      <header class="topbar"><div class="breadcrumb">WORKSPACE <span>/</span> <strong id="breadcrumb">总览指挥舱</strong></div><div class="top-actions"><span class="live"><i></i> LOCAL DATA</span><span id="connection">连接中</span><button class="icon-button" id="refresh" title="刷新数据" aria-label="刷新数据">↻</button><div class="avatar">S</div></div></header>
-      <div id="app" class="content" aria-live="polite"><div class="loading">正在连接工作空间…</div></div>
-      <footer>OPC MISSION CONTROL <span>·</span> HUMAN IN THE LOOP <span>·</span> JUNCTION CHINA 2026</footer>
-    </main>
+
+    <section class="main-column">
+      <header class="topbar">
+        <div>
+          <div class="breadcrumb">启航教育 / 考研全程班私域</div>
+          <h1 id="page-title">运营工作台</h1>
+        </div>
+        <div class="topbar-actions"><button class="icon-button mobile-menu" id="mobile-menu" title="打开导航"><i data-lucide="menu"></i></button>
+          <label class="search-box"><i data-lucide="search"></i><input type="search" placeholder="搜索用户、SOP 或话术"></label>
+          <button class="button secondary" id="open-import"><i data-lucide="upload"></i>导入 SOP</button>
+          <button class="icon-button" title="通知"><i data-lucide="bell"></i><span class="notification-dot"></span></button>
+          <button class="icon-button" title="帮助"><i data-lucide="circle-help"></i></button>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <section class="page active" id="page-workspace">
+          <div class="welcome-band">
+            <div>
+              <div class="eyebrow">11 月 7 日 · 周五</div>
+              <h2>今天的转化重点是 3 位用户</h2>
+              <p>已按公司 SOP 驱动 5 个客户场景，服务运营智能体完成应答与质检，增长分析智能体已生成跟进建议。</p>
+            </div>
+            <div class="welcome-actions">
+              <button class="button primary jump-chat"><i data-lucide="message-circle-more"></i>进入接待</button>
+              <button class="button secondary" data-page-jump="profile"><i data-lucide="users-round"></i>查看名单</button>
+            </div>
+          </div>
+
+          <div class="metric-grid">
+            <article class="metric"><span>今日会话</span><strong>28</strong><small class="up">较昨日 +12%</small><i data-lucide="messages-square"></i></article>
+            <article class="metric"><span>AI 自动回复</span><strong>23</strong><small>自动率 82%</small><i data-lucide="bot"></i></article>
+            <article class="metric risk"><span>质检拦截</span><strong>3</strong><small class="warn">1 条需人工确认</small><i data-lucide="shield-alert"></i></article>
+            <article class="metric"><span>高意向用户</span><strong>5</strong><small class="up">新增 2 位</small><i data-lucide="flame"></i></article>
+          </div>
+
+          <div class="workspace-grid">
+            <section class="panel scenario-board">
+              <div class="panel-header">
+                <div><span class="section-kicker">SOP 场景推进</span><h3>五个客户场景</h3></div>
+                <button class="icon-button" title="筛选场景"><i data-lucide="list-filter"></i></button>
+              </div>
+              <div class="scenario-list" id="scenario-list"></div>
+            </section>
+
+            <section class="panel today-list">
+              <div class="panel-header">
+                <div><span class="section-kicker">增长分析智能体</span><h3>今日跟进</h3></div>
+                <button class="text-button" data-page-jump="profile">全部 3 人 <i data-lucide="arrow-right"></i></button>
+              </div>
+              <div class="follow-list" id="dashboard-follow-list"></div>
+            </section>
+
+            <section class="panel agent-flow">
+              <div class="panel-header">
+                <div><span class="section-kicker">实时协作</span><h3>两智能体工作链</h3></div>
+                <span class="status-pill success"><i data-lucide="circle-check"></i>运行正常</span>
+              </div>
+              <div class="flow-row">
+                <div class="flow-node"><span>01</span><i data-lucide="message-square-text"></i><strong>服务运营智能体</strong><small>识别问题 · 生成 3 备选 · 质检 · 发送</small></div>
+                <i data-lucide="arrow-right" class="flow-arrow"></i>
+                <div class="flow-node"><span>02</span><i data-lucide="chart-no-axes-combined"></i><strong>增长分析智能体</strong><small>汇总行为 · 打标签 · 分层 · 生成话术</small></div>
+                <i data-lucide="arrow-right" class="flow-arrow"></i>
+                <div class="flow-node human"><span>03</span><i data-lucide="user-check"></i><strong>运营老师</strong><small>选择回复 · 人工决策 · 沉淀经验</small></div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="page" id="page-chat">
+          <div class="chat-layout">
+            <aside class="customer-list">
+              <div class="panel-header compact">
+                <div><span class="section-kicker">3 位演示用户</span><h3>会话</h3></div>
+                <button class="icon-button" title="发起新会话"><i data-lucide="square-pen"></i></button>
+              </div>
+              <div class="customer-search"><i data-lucide="search"></i><input placeholder="搜索会话"></div>
+              <div id="customer-cards"></div>
+            </aside>
+
+            <section class="conversation">
+              <header class="conversation-head">
+                <div class="person">
+                  <img id="active-avatar" src="./assets/xiaolin.png" alt="当前用户头像">
+                  <div><strong id="active-name">小林</strong><span id="active-context">高活跃度用户 · 高意向</span></div>
+                </div>
+                <div class="conversation-actions">
+                  <button class="button secondary compact-btn" id="simulate-user"><i data-lucide="sparkles"></i>模拟用户提问</button>
+                  <button class="icon-button" title="更多操作"><i data-lucide="ellipsis"></i></button>
+                </div>
+              </header>
+
+              <div class="message-stage" id="message-stage"></div>
+
+              <section class="reply-composer">
+                <div class="reply-topline">
+                  <div><span class="agent-avatar service small">服</span><strong>服务运营智能体</strong><span class="generated-time">基于当前 SOP 阶段生成</span></div>
+                  <button class="icon-button" title="重新生成"><i data-lucide="refresh-cw"></i></button>
+                </div>
+                <div class="reply-alert hidden" id="risk-alert">
+                  <i data-lucide="shield-alert"></i>
+                  <div><strong>质检提醒 · 高风险敏感问题</strong><span id="risk-text">识别到“随时退款”等承诺性表达，必须转人工确认。</span></div>
+                  <span class="status-pill danger">需审核</span>
+                </div>
+                <div class="reply-options" id="reply-options"></div>
+                <div class="custom-reply">
+                  <label for="custom-reply-input">自定义回复</label>
+                  <textarea id="custom-reply-input" rows="2" placeholder="不满意备选？可直接修改或自行定义回复内容"></textarea>
+                </div>
+                <div class="composer-footer">
+                  <div class="composer-tools">
+                    <button class="icon-button" title="插入文件"><i data-lucide="paperclip"></i></button>
+                    <button class="icon-button" title="插入知识库"><i data-lucide="book-open-text"></i></button>
+                    <span class="memory-note"><i data-lucide="brain"></i>本次选择将进入场景记忆</span>
+                  </div>
+                  <button class="button primary" id="send-reply"><i data-lucide="send"></i>审核并发送</button>
+                </div>
+              </section>
+            </section>
+
+            <aside class="context-panel">
+              <div class="context-tabs">
+                <button class="active">用户画像</button>
+                <button>SOP 状态</button>
+              </div>
+              <div id="chat-profile"></div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="page" id="page-profile">
+          <div class="page-heading">
+            <div><span class="section-kicker">增长分析智能体</span><h2>用户画像与跟进</h2><p>融合运营对话和产品使用数据，自动形成最近行为概括、AI 标签、人工备注、分层建议和专属话术。</p></div>
+            <button class="button secondary" id="refresh-profile"><i data-lucide="refresh-cw"></i>刷新画像</button>
+          </div>
+
+          <div class="profile-layout">
+            <aside class="profile-list">
+              <div class="segment-control">
+                <button class="active">全部 3</button><button>高意向 2</button><button>待激活 1</button>
+              </div>
+              <div id="profile-user-list"></div>
+            </aside>
+            <section class="profile-detail" id="profile-detail"></section>
+          </div>
+        </section>
+
+        <section class="page" id="page-sop">
+          <div class="page-heading">
+            <div><span class="section-kicker">SOP 数字化执行</span><h2>考研全程班 SOP</h2><p>当前 SOP 已覆盖普通咨询、价格意向、试听转化、质检转人工和用户分层跟进。</p></div>
+            <div class="page-actions"><button class="button secondary"><i data-lucide="history"></i>版本记录</button><button class="button primary" id="adjust-sop"><i data-lucide="sliders-horizontal"></i>微调 SOP</button></div>
+          </div>
+
+          <div class="sop-summary">
+            <div><span class="status-pill success"><i data-lucide="circle-check"></i>已上线</span><strong>5 个流程阶段</strong><small>12 条知识 · 3 条质检规则</small></div>
+            <div><span>最近更新</span><strong>今天 09:26</strong><small>由林老师确认</small></div>
+            <div><span>AI 自动执行</span><strong>82%</strong><small>其余进入人工决策</small></div>
+          </div>
+
+          <div class="sop-flow" id="sop-flow"></div>
+
+          <section class="panel exception-panel">
+            <div class="panel-header"><div><span class="section-kicker">运营发现不合理？</span><h3>SOP 可持续修正</h3></div><button class="button secondary" id="adjust-sop-inline"><i data-lucide="pencil"></i>调整时间</button></div>
+            <p>老师可以在运营过程中修改时间、触发条件或话术。保存时可选择仅本次生效，或沉淀为公司 SOP 默认规则供下次使用。</p>
+            <div class="change-history" id="change-history">
+              <span><i data-lucide="clock-3"></i>暂无人工微调记录</span>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" id="page-quality">
+          <div class="page-heading">
+            <div><span class="section-kicker">服务运营智能体 · 质检</span><h2>话术库与风险质检</h2><p>上传公司话术库后，禁止词和高风险动作会在 AI 回复备选中直接插出质检提醒，发送前由运营老师审核。</p></div>
+            <button class="button primary" id="upload-script"><i data-lucide="file-up"></i>上传话术库</button>
+          </div>
+
+          <div class="quality-grid">
+            <section class="panel">
+              <div class="panel-header"><div><span class="section-kicker">公司话术库</span><h3>标准口径</h3></div><span class="status-pill success">12 条已启用</span></div>
+              <div class="knowledge-list">
+                <div><span>课程价格</span><strong>以机构价目表为准，按科目与班型分档</strong><button class="icon-button" title="编辑"><i data-lucide="pencil"></i></button></div>
+                <div><span>退费政策</span><strong>以正式退费政策为准，签约前请仔细阅读</strong><button class="icon-button" title="编辑"><i data-lucide="pencil"></i></button></div>
+                <div><span>免费试听</span><strong>可预约免费试听，以本期试听安排为准</strong><button class="icon-button" title="编辑"><i data-lucide="pencil"></i></button></div>
+                <div><span>课程回放</span><strong>有回放，有效期以回放规则为准</strong><button class="icon-button" title="编辑"><i data-lucide="pencil"></i></button></div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header"><div><span class="section-kicker">禁止词与风险动作</span><h3>质检规则</h3></div><button class="icon-button" title="新增规则"><i data-lucide="plus"></i></button></div>
+              <div class="rule-list">
+                <div><span class="status-pill danger">禁止词</span><strong>保过 / 包过 / 一定能录取</strong><small>命中后禁止自动发送</small></div>
+                <div><span class="status-pill danger">风险动作</span><strong>承诺可随时退款</strong><small>必须转人工审核</small></div>
+                <div><span class="status-pill warning">风险动作</span><strong>承诺锁定价格或优惠</strong><small>需核对当期活动</small></div>
+                <div><span class="status-pill warning">风险表述</span><strong>夸大师资或效果</strong><small>改为引用官方介绍</small></div>
+              </div>
+            </section>
+
+            <section class="panel audit-sample">
+              <div class="panel-header"><div><span class="section-kicker">实时案例</span><h3>退费问题拦截</h3></div><span class="status-pill danger">等待人工</span></div>
+              <div class="quote">用户：那报名以后可以随时退款吗？</div>
+              <div class="audit-warning"><i data-lucide="triangle-alert"></i><div><strong>识别到高风险动作：承诺可随时退款</strong><span>AI 原始候选包含“可以随时退款”，已拦截，不得自动发送。</span></div></div>
+              <div class="safe-reply"><span>合规候选</span><p>退费政策以您签署的课程服务协议为准，我先把正式退费规则发给您确认。由于这里需要准确解释政策，我会同步转给运营老师做人工确认。</p></div>
+              <button class="button primary" data-page-jump="chat"><i data-lucide="user-check"></i>前往人工审核</button>
+            </section>
+          </div>
+        </section>
+
+        <section class="page" id="page-simulator">
+          <div class="page-heading">
+            <div><span class="section-kicker">Web 聊天演示轨</span><h2>客户端模拟</h2><p>使用与真实企业微信一致的消息协议，展示用户看到的对话结果，同时保留运营工作台的人工控制。</p></div>
+            <button class="button secondary" id="reset-simulator"><i data-lucide="rotate-ccw"></i>重置演示</button>
+          </div>
+
+          <div class="simulator-layout">
+            <section class="sim-control panel">
+              <div class="panel-header"><div><span class="section-kicker">演示控制台</span><h3>选择场景</h3></div></div>
+              <div class="sim-scenarios" id="sim-scenarios"></div>
+              <div class="sim-user-pick"><span>当前客户</span><div id="sim-user-buttons"></div></div>
+              <div class="sim-note"><i data-lucide="info"></i><span>右侧显示客户端界面。点击工作台中的发送后，消息会同步出现在这里。</span></div>
+            </section>
+
+            <section class="phone-wrap">
+              <div class="phone">
+                <div class="phone-top"><span>09:41</span><i data-lucide="battery-full"></i></div>
+                <div class="phone-head"><i data-lucide="chevron-left"></i><strong>启航教育课程老师</strong><i data-lucide="ellipsis"></i></div>
+                <div class="phone-messages" id="phone-messages"></div>
+                <div class="phone-input"><i data-lucide="mic"></i><span>发消息...</span><i data-lucide="smile"></i><i data-lucide="circle-plus"></i></div>
+              </div>
+            </section>
+
+            <section class="protocol-panel panel">
+              <div class="panel-header"><div><span class="section-kicker">统一消息协议</span><h3>消息流</h3></div><span class="status-pill success">同步中</span></div>
+              <div class="protocol-step done"><i data-lucide="message-circle"></i><div><strong>客户端消息</strong><small>映射为标准 JSON 消息事件</small></div></div>
+              <div class="protocol-step done"><i data-lucide="bot"></i><div><strong>服务运营智能体</strong><small>检索 SOP 与话术库，产出候选</small></div></div>
+              <div class="protocol-step"><i data-lucide="user-check"></i><div><strong>运营老师确认</strong><small>低风险可自动，高风险必须审核</small></div></div>
+              <div class="protocol-step"><i data-lucide="send"></i><div><strong>客户端同步</strong><small>发送结果回写会话与用户画像</small></div></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </section>
   </div>
-  <div id="toast" role="status"></div>
-=======
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <meta name="theme-color" content="#17181c"/>
-  <meta name="description" content="私域合伙人运营工作台：客户会话、客户画像、SOP 管理、跟进线索与日结报告。"/>
-  <title>私域合伙人 · 运营工作台</title>
-</head>
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.jsx"></script>
->>>>>>> 63625db7de08473c3560290102df65491798ed49
+
+  <div class="modal-layer hidden" id="import-modal">
+    <div class="modal">
+      <div class="modal-header"><div><span class="section-kicker">SOP 接入</span><h3>导入公司 SOP</h3></div><button class="icon-button close-modal"><i data-lucide="x"></i></button></div>
+      <div class="upload-zone"><i data-lucide="file-up"></i><strong>拖入 Word / PDF / Excel / 截图</strong><span>也可粘贴文本，AI 将抽取阶段、触发条件、话术和转人工规则</span><button class="button secondary">选择文件</button></div>
+      <div class="parse-preview"><span class="status-pill success">解析完成</span><strong>识别到 5 个阶段、12 条知识、3 条质检规则</strong><small>AI 起草 · 需要运营老师确认后上线</small></div>
+      <div class="modal-footer"><button class="button secondary close-modal">取消</button><button class="button primary" id="confirm-import"><i data-lucide="check"></i>确认并上线</button></div>
+    </div>
+  </div>
+
+  <div class="modal-layer hidden" id="sop-modal">
+    <div class="modal">
+      <div class="modal-header"><div><span class="section-kicker">运营中修正</span><h3>调整 SOP 时间</h3></div><button class="icon-button close-modal"><i data-lucide="x"></i></button></div>
+      <label class="field"><span>流程节点</span><select id="sop-step-select"></select></label>
+      <label class="field"><span>触发时间</span><div class="time-edit"><button class="icon-button" id="time-minus" title="减少一天"><i data-lucide="minus"></i></button><strong id="time-value">1 天</strong><button class="icon-button" id="time-plus" title="增加一天"><i data-lucide="plus"></i></button></div></label>
+      <div class="modal-info"><i data-lucide="lightbulb"></i><span>例如：将试听邀约后的跟进从 1 天改为 0.5 天，让高意向用户更快得到回访。</span></div>
+      <div class="modal-footer"><button class="button secondary close-modal">取消</button><button class="button primary" id="save-sop-change">保存修改</button></div>
+    </div>
+  </div>
+
+  <div class="modal-layer hidden" id="retention-modal">
+    <div class="modal small-modal">
+      <div class="modal-header"><div><span class="section-kicker">SOP 修改提醒</span><h3>是否保留此次修改？</h3></div><button class="icon-button close-modal"><i data-lucide="x"></i></button></div>
+      <p>你刚刚将“<strong id="retention-step">试听邀约</strong>”的触发时间调整为“<strong id="retention-time">0.5 天</strong>”。</p>
+      <div class="retention-options">
+        <button class="retention-card" data-retention="once"><i data-lucide="clock-3"></i><strong>仅本次使用</strong><span>用于当前用户，不影响下次流程</span></button>
+        <button class="retention-card recommended" data-retention="keep"><i data-lucide="save"></i><strong>保存供下次使用</strong><span>沉淀为公司 SOP 默认规则</span></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"><i data-lucide="circle-check"></i><span>已完成</span></div>
+
+  <script src="./assets/lucide.min.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
+

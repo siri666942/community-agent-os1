@@ -28,10 +28,7 @@ def connect(path=DB_PATH):
     CREATE TABLE IF NOT EXISTS drafts(id TEXT PRIMARY KEY, task_id TEXT UNIQUE NOT NULL REFERENCES tasks(id), artifact_id TEXT NOT NULL REFERENCES artifacts(id), content_hash TEXT NOT NULL, status TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY, type TEXT NOT NULL, status TEXT NOT NULL, input_ref TEXT NOT NULL, result TEXT NOT NULL DEFAULT '{}');
     CREATE TABLE IF NOT EXISTS trace(seq INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL, at TEXT NOT NULL, owner TEXT NOT NULL, action TEXT NOT NULL, status TEXT NOT NULL, details TEXT NOT NULL);
-<<<<<<< HEAD
-=======
     CREATE TABLE IF NOT EXISTS consent_changes(id TEXT PRIMARY KEY, customer_id TEXT NOT NULL REFERENCES customers(id), consent INTEGER NOT NULL, source TEXT NOT NULL, at TEXT NOT NULL);
->>>>>>> 63625db7de08473c3560290102df65491798ed49
     CREATE TABLE IF NOT EXISTS state_changes(id TEXT PRIMARY KEY, customer_id TEXT NOT NULL REFERENCES customers(id), old_stage TEXT NOT NULL, new_stage TEXT NOT NULL, reason TEXT NOT NULL, at TEXT NOT NULL);
     ''')
     return db
@@ -224,21 +221,13 @@ def inbound(db, customer_id, message, message_id=None, *, auto=False):
     from .agents import frontdesk
     if not message.strip():
         raise ValueError('消息不能为空')
-<<<<<<< HEAD
-    if not db.execute('SELECT 1 FROM customers WHERE id=?', (customer_id,)).fetchone():
-=======
     customer = db.execute('SELECT source FROM customers WHERE id=?', (customer_id,)).fetchone()
     if not customer:
->>>>>>> 63625db7de08473c3560290102df65491798ed49
         raise ValueError('客户不存在')
     message_id = message_id or _id('message-')
     run_id = _run_id('inbound-')
     with db:
-<<<<<<< HEAD
-        db.execute('INSERT INTO events VALUES (?,?,?,?,?)', (message_id, customer_id, 'interaction', date.today().isoformat(), '入站消息'))
-=======
         db.execute('INSERT INTO events VALUES (?,?,?,?,?)', (message_id, customer_id, 'interaction', date.today().isoformat(), '模拟入站消息' if customer['source'] == '模拟入站消息' else '入站消息'))
->>>>>>> 63625db7de08473c3560290102df65491798ed49
         db.execute('INSERT INTO runs(id,type,status,input_ref) VALUES (?,?,?,?)', (run_id, 'INBOUND_MESSAGE', 'RUNNING', message_id))
         _trace(db, run_id, 'COO', '登记入站消息', 'RUNNING', {'customer_id': customer_id, 'message_id': message_id})
     try:
@@ -304,8 +293,7 @@ def change_stage(db, customer_id, new_stage, reason):
         raise
 
 
-<<<<<<< HEAD
-=======
+
 
 def change_consent(db, customer_id, consent, source):
     """Record an explicit human-supplied consent source or withdrawal."""
@@ -317,7 +305,7 @@ def change_consent(db, customer_id, consent, source):
         db.execute('INSERT INTO consent_changes VALUES (?,?,?,?,?)',
                    (_id('consent-'), customer_id, int(consent), source.strip(), datetime.now().isoformat(timespec='seconds')))
 
->>>>>>> 63625db7de08473c3560290102df65491798ed49
+
 def main():
     parser = argparse.ArgumentParser(description='双 Agent 受控工作流（本地草稿，不发送消息）')
     parser.add_argument('action', choices=['seed', 'analyze', 'plan', 'content', 'approve', 'queue', 'list', 'receipt', 'inbound', 'sop', 'stage'])

@@ -36,3 +36,6 @@ __pycache__/
 *.py[cod]
 __MACOSX/
 .playwright-mcp/
+
+# Local web backup (old version)
+_backup/

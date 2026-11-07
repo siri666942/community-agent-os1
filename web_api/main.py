@@ -4,10 +4,6 @@ This server binds to loopback and never sends messages to parents. Jobs run in
 separate processes so CLI approval prompts receive EOF instead of blocking.
 """
 import json
-<<<<<<< HEAD
-=======
-import mimetypes
->>>>>>> 63625db7de08473c3560290102df65491798ed49
 import os
 import re
 import subprocess
@@ -28,11 +24,19 @@ from opc.llm import log_action
 ROOT = Path(config.ROOT)
 JOBS = {}
 LOCK = threading.Lock()
-<<<<<<< HEAD
-ORIGINS = ('http://localhost:5173', 'http://127.0.0.1:5173',
-           'http://localhost:8765', 'http://127.0.0.1:8765')
-=======
->>>>>>> 63625db7de08473c3560290102df65491798ed49
+
+# 免构建静态前端（page/ 并入 web/）：仅允许这些扩展名，路径解析后必须位于 web/ 内。
+STATIC_TYPES = {
+    '.html': 'text/html; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.js': 'text/javascript; charset=utf-8',
+    '.json': 'application/json; charset=utf-8',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.svg': 'image/svg+xml',
+    '.ico': 'image/x-icon',
+    '.woff2': 'font/woff2',
+}
 
 
 def _read(path):
@@ -61,11 +65,7 @@ def workflow_state():
     with LOCK:
         recover_pending()
     with closing(workflow.connect()) as db:
-<<<<<<< HEAD
-        data = {name: _rows(db, name) for name in ('runs', 'trace', 'tasks', 'artifacts', 'approvals', 'drafts')}
-=======
         data = {name: _rows(db, name) for name in ('runs', 'trace', 'tasks', 'artifacts', 'approvals', 'drafts', 'events', 'state_changes', 'consent_changes')}
->>>>>>> 63625db7de08473c3560290102df65491798ed49
         data['analysis'] = workflow.analyze(db)
         for artifact in data['artifacts']:
             artifact['review'] = json.loads(artifact['review'])
@@ -393,28 +393,13 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Content-Length', str(len(content)))
-<<<<<<< HEAD
-        origin = self.headers.get('Origin', '')
-        if origin in ORIGINS:
-            self.send_header('Access-Control-Allow-Origin', origin)
-            self.send_header('Vary', 'Origin')
-=======
         self.send_header('Access-Control-Allow-Origin', '*')
->>>>>>> 63625db7de08473c3560290102df65491798ed49
         self.end_headers()
         self.wfile.write(content)
 
     def do_OPTIONS(self):
-<<<<<<< HEAD
-        origin = self.headers.get('Origin', '')
-        if origin not in ORIGINS:
-            return self._send(403, {'error': '不允许的来源'})
-        self.send_response(204)
-        self.send_header('Access-Control-Allow-Origin', origin)
-=======
         self.send_response(204)
         self.send_header('Access-Control-Allow-Origin', '*')
->>>>>>> 63625db7de08473c3560290102df65491798ed49
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
@@ -422,34 +407,16 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             path = urlparse(self.path).path
-<<<<<<< HEAD
-            static = {'/': ('index.html', 'text/html'), '/index.html': ('index.html', 'text/html'),
-                      '/styles.css': ('styles.css', 'text/css'), '/app.js': ('app.js', 'text/javascript')}
-            if path in static:
-                filename, mime = static[path]
-                file = ROOT / 'web' / filename
-                if not file.is_file(): return self._send(404, {'error': '页面不存在'})
+            # 免构建静态前端：直接服务 web/ 下的页面与资源（路径解析后不得越出 web/）。
+            web_root = (ROOT / 'web').resolve()
+            rel = 'index.html' if path == '/' else path.lstrip('/')
+            file = (web_root / rel).resolve()
+            if file.is_relative_to(web_root) and file.suffix in STATIC_TYPES and file.is_file():
                 content = file.read_bytes()
                 self.send_response(200)
-                self.send_header('Content-Type', mime + '; charset=utf-8')
+                self.send_header('Content-Type', STATIC_TYPES[file.suffix])
                 self.send_header('Content-Length', str(len(content)))
-=======
-            # Vite production output; source JSX is served only by the dev server.
-            if path in ('/', '/index.html') or path.startswith('/assets/'):
-                dist = (ROOT / 'web' / 'dist').resolve()
-                file = (dist / ('index.html' if path in ('/', '/index.html') else path.lstrip('/'))).resolve()
-                if file != dist and dist not in file.parents:
-                    return self._send(404, {'error': '页面不存在'})
-                if not file.is_file():
-                    return self._send(503 if path in ('/', '/index.html') else 404,
-                                      {'error': '缺少 React 构建文件；请在 junction/web 运行 npm install && npm run build'})
-                content = file.read_bytes()
-                mime = mimetypes.guess_type(file.name)[0] or 'application/octet-stream'
-                self.send_response(200)
-                self.send_header('Content-Type', mime + ('; charset=utf-8' if mime.startswith('text/') or mime == 'application/javascript' else ''))
-                self.send_header('Content-Length', str(len(content)))
-                self.send_header('Cache-Control', 'no-cache' if path in ('/', '/index.html') else 'public, max-age=31536000, immutable')
->>>>>>> 63625db7de08473c3560290102df65491798ed49
+                self.send_header('Cache-Control', 'no-cache' if file.suffix == '.html' else 'public, max-age=3600')
                 self.end_headers()
                 self.wfile.write(content)
                 return
@@ -464,12 +431,6 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
-<<<<<<< HEAD
-            origin = self.headers.get('Origin')
-            if origin and origin not in ORIGINS:
-                return self._send(403, {'error': '不允许的来源'})
-=======
->>>>>>> 63625db7de08473c3560290102df65491798ed49
             if self.headers.get_content_type() != 'application/json':
                 return self._send(415, {'error': '请求必须为 JSON'})
             length = int(self.headers.get('Content-Length', '0'))
@@ -479,10 +440,6 @@ class Handler(BaseHTTPRequestHandler):
             path = urlparse(self.path).path
             if path == '/api/approvals': return self._send(200, approval(payload))
             if path == '/api/human-tasks': return self._send(200, resolve_human_task(payload))
-<<<<<<< HEAD
-            endpoints = {'/api/service': 'service', '/api/sop': 'sop', '/api/report': 'report'}
-            endpoints.update({f'/api/workflow/{key}': 'workflow-' + key for key in ('seed', 'plan', 'content', 'approve', 'queue', 'receipt')})
-=======
             if path in ('/api/customers/stage', '/api/customers/consent'):
                 with closing(workflow.connect()) as db:
                     if path.endswith('/stage'):
@@ -492,7 +449,6 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, {'status': 'UPDATED'})
             endpoints = {'/api/service': 'service', '/api/sop': 'sop', '/api/report': 'report'}
             endpoints.update({f'/api/workflow/{key}': 'workflow-' + key for key in ('seed', 'plan', 'plan-content', 'content', 'approve', 'queue', 'receipt')})
->>>>>>> 63625db7de08473c3560290102df65491798ed49
             if path not in endpoints: return self._send(404, {'error': '未找到接口'})
             return self._send(202, start_job(endpoints[path], payload))
         except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:

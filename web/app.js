@@ -1,91 +1,442 @@
-const app = document.querySelector('#app');
-const names = {dashboard:'总览指挥舱',workspace:'Agent 工作台',growth:'增长协作',operations:'运营中心',risk:'风控与审批',analytics:'经营分析'};
-const state = {page:'dashboard', data:null, workflow:null, batch:null, ticket:null, selected:null, package:null, report:null, busy:false, error:''};
-const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const label = x => ({PASS:'审核通过',REVIEW_REQUIRED:'待人工复核',PENDING:'待审批',APPROVED:'已批准',REJECTED:'已打回',SIMULATED_APPROVAL:'模拟批准',READY:'可交付',INCOMPLETE:'未完成',PENDING_APPROVAL:'待审批',PLANNED:'已规划',WAITING_CONTENT:'待生成',HUMAN_REVIEW:'人工复核',PAUSED:'暂停触达',DRAFT:'本地草稿',SIMULATED_DELIVERY:'模拟送达',COMPLETE:'已完成'}[x] || x || '未知');
-const tag = x => `<span class="tag ${['PENDING','REVIEW_REQUIRED','PENDING_APPROVAL','SIMULATED_APPROVAL','INCOMPLETE'].includes(x)?'amber':['REJECTED'].includes(x)?'red':''}">${esc(label(x))}</span>`;
-const head = (eyebrow,title,desc,action='') => `<div class="page-head"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1><p>${desc}</p></div>${action}</div>`;
-const panelHead = (title,desc='',right='') => `<div class="panel-head"><div><h2>${title}</h2><p>${desc}</p></div>${right}</div>`;
-const empty = (title,detail) => `<div class="empty"><strong>${title}</strong>${detail}</div>`;
-const metric = (title,value,detail,icon) => `<div class="card metric"><div class="metric-top"><span>${title}</span><span>${icon}</span></div><strong>${esc(value)}</strong><small>${detail}</small></div>`;
-const block = (title,content) => `<div class="detail-block"><h3>${title}</h3><div class="prose">${esc(content || '暂无')}</div></div>`;
-function packageMaterial(packageRecord){
- const tasks=packageRecord?.tasks;
- if(!Array.isArray(tasks)||!tasks.length||tasks.some(t=>!t.task||!t.review||['time','channel','audience','source'].some(k=>typeof t.task[k]!=='string')||typeof t.review.status!=='string'||typeof t.review.content!=='string'))return null;
- return tasks.map((t,i)=>`## 任务 ${i+1} · ${t.task.time} / ${t.task.channel} / ${t.task.audience}\n来源: ${t.task.source} | 审核: ${t.review.status}\n\n${t.review.content}`).join('\n\n');
+const assets = "./assets/";
+const users = {
+  xiaolin: {
+    id:"xiaolin", name:"小林", avatar:assets+"xiaolin.png", time:"刚刚", tier:"S1 高价值推进",
+    context:"高活跃度用户 · 高意向", status:"在线",
+    summary:"近 7 天有 6 天活跃，连续查看专业课资料并完成 83% 试听课。今天主动询问优惠和下一步安排，转化窗口正在打开。",
+    tags:["高活跃度用户","高意向","试听完成","价格关注"],
+    manual:"已加两场直播课，沟通风格直接。希望在本周内确定班型。",
+    behavior:[
+      ["messages-square","会话与反馈","询问“报名后还有哪些规划”，表达希望尽快开始系统复习。"],
+      ["book-open-check","产品使用","近 7 天打开资料 12 次；试听课观看 83%，测评完成 2 次。"],
+      ["mouse-pointer-click","关键行为","今天 09:12 再次查看价格页，停留 4 分 26 秒。"]
+    ],
+    scores:[["活跃度","92"],["意向度","88"],["转化阶段","试听后"]],
+    advice:"加紧推进下一步。趁用户表达明确规划需求，先询问备考时间与目标院校，再给出本期早鸟优惠，降低决策阻力。",
+    script:"小林，你的试听完成度和资料使用频率都很高。你接下来打算把重点放在哪几科？如果计划 11 月开课，我可以按当前早鸟政策帮你核算对应班型，今天确认还能锁定本期优惠。",
+    conversation:[
+      {type:"day",text:"今天 09:08"},
+      {type:"user",text:"老师，我昨天试听完了。这个全程班后面还有阶段性规划吗？"},
+      {type:"ai",text:"有的。全程班会按基础、强化、冲刺三个阶段推进，并配套阶段测评与答疑。你更关注哪一科的复习安排？"},
+      {type:"user",text:"我主要想把专业课提上来。现在报名是不是有什么优惠？"}
+    ],
+    replies:[
+      {label:"推荐 · 推进转化",text:"我先按你的目标和时间做一个班型建议。现在报名有早鸟政策，具体能锁定的优惠以本期活动为准。你准备什么时候开始系统复习？",quality:"低风险 · 与课程政策一致"},
+      {label:"稳妥 · 先问需求",text:"可以的。为了不推荐错班型，我先确认一下你的目标院校和每天可用复习时间，再把优惠方案一起发给你。",quality:"低风险 · 先补全画像"},
+      {label:"简洁 · 促成行动",text:"现在有本期早鸟与团报优惠。你可以把目标院校和计划开课时间发我，我马上帮你核算对应班型。",quality:"注意 · 优惠以当期活动为准"}
+    ],
+    risk:false
+  },
+  zhouzhou: {
+    id:"zhouzhou", name:"周周", avatar:assets+"zhouzhou.png", time:"8 分钟前", tier:"A2 意向培育",
+    context:"价格敏感 · 观望中", status:"已读",
+    summary:"近 3 天多次比较班型和价格，询问过资料、回放与师资。产品端仅试看 18%，尚未预约试听，当前更关注确定成本后再行动。",
+    tags:["价格敏感","反复比价","未预约试听"],
+    manual:"应届备考，预算有限。可优先介绍分期或团报，但不承诺额外折扣。",
+    behavior:[
+      ["messages-square","会话与反馈","关注总价、回放有效期和不同班型差异，尚未表达明确拒绝。"],
+      ["play-circle","产品使用","课程详情页浏览 5 次，试看 18%，资料下载 1 次。"],
+      ["timer-reset","跟进状态","距离上一次有效互动 8 分钟，适合在本次会话中推动预约。"]
+    ],
+    scores:[["活跃度","68"],["意向度","74"],["转化阶段","比价"]],
+    advice:"先降低决策成本，再推进试听。明确解释班型差异和正式价格政策，避免承诺额外折扣；给出免费试听作为下一步。",
+    script:"周周，如果现在主要比较预算，我可以按你的科目和学习基础帮你拆解不同班型的差异，避免多花费用。要不要先约一节免费试听？试听后再决定，也不会影响现有优惠资格。",
+    conversation:[
+      {type:"day",text:"今天 09:21"},
+      {type:"user",text:"你们全程班到底多少钱？我看别人说价格不一样。"},
+      {type:"ai",text:"课程价格会按科目、班型和服务内容分档，我需要按你的情况匹配正式价目，避免报错。"}
+    ],
+    replies:[
+      {label:"推荐 · 价值拆解",text:"价格按科目、班型和服务内容分档。告诉我你的目标科目，我帮你按正式价目表拆解，比较哪档更适合你。",quality:"低风险 · 不承诺额外优惠"},
+      {label:"转化 · 引导试听",text:"不同班型对应的服务和价格不同。可以先预约免费试听，体验课程后再确认班型，不会影响本期优惠资格。",quality:"低风险 · 试听邀约"},
+      {label:"谨慎 · 口径说明",text:"我先发一份当前班型与服务对照表，最终价格以机构正式价目表为准。你更关心总价，还是单科价格？",quality:"注意 · 不口头锁定价格"}
+    ],
+    risk:false
+  },
+  jiajia: {
+    id:"jiajia", name:"佳佳", avatar:assets+"jiajia.png", time:"22 分钟前", tier:"B3 待激活",
+    context:"敏感问题 · 需人工审核", status:"待回复",
+    summary:"入群 8 天，近 3 天只浏览过退款政策，未观看试听或下载资料。今天询问“是否可随时退款”，属于高风险敏感问题，已触发质检转人工。",
+    tags:["待激活","退费关注","风险咨询"],
+    manual:"昨日备注：家长可能对合同条款有顾虑，回复时不要催单。",
+    behavior:[
+      ["messages-square","会话与反馈","询问报名后能否随时退款，表达对合同约束的担忧。"],
+      ["file-search","产品使用","查看退费政策 3 次，累计 6 分 12 秒；未观看课程内容。"],
+      ["shield-alert","质检记录","命中风险动作“承诺可随时退款”，候选回复已拦截。"]
+    ],
+    scores:[["活跃度","31"],["意向度","46"],["转化阶段","风险澄清"]],
+    advice:"优先处理顾虑，不推进促销。先发送正式退费规则并由人工解释，确认其顾虑是否来自退费、时间冲突或家人意见，再决定后续路径。",
+    script:"佳佳，退费政策以你签署的课程服务协议为准。我先把正式规则发给你确认。考虑到这里涉及合同条款，我会请运营老师人工说明，确保信息准确，也先不给你额外的报名压力。",
+    conversation:[
+      {type:"day",text:"今天 09:36"},
+      {type:"user",text:"我先问一下，要是报名以后发现不适合，能随时退款吗？"},
+      {type:"ai",text:"质检检测到该问题涉及退款承诺，已暂停自动回复并转人工确认。"}
+    ],
+    replies:[
+      {label:"合规 · 转人工",text:"退费政策以你签署的课程服务协议为准。我先把正式规则发给你确认，并同步请运营老师人工说明，确保信息准确。",quality:"已移除“随时退款”承诺"},
+      {label:"澄清 · 识别顾虑",text:"我理解你在报名前想确认保障。我先发正式退费规则，同时想了解你更担心课程不适合，还是时间安排冲突？",quality:"注意 · 不承诺退费结果"},
+      {label:"谨慎 · 仅发政策",text:"关于退费，应以正式课程服务协议中的条款为准。我可以把规则原文发给你，由运营老师再做说明。",quality:"低风险 · 避免解释争议"}
+    ],
+    risk:true
+  }
+};
+
+const scenarios = [
+  {name:"普通咨询",user:"zhouzhou",desc:"课程内容与回放规则",status:"已完成",progress:100,icon:"message-circle-question"},
+  {name:"价格意向",user:"zhouzhou",desc:"报价、优惠与班型差异",status:"处理中",progress:68,icon:"badge-dollar-sign"},
+  {name:"试听转化",user:"xiaolin",desc:"试听完成后的下一步",status:"待跟进",progress:52,icon:"calendar-check-2"},
+  {name:"质检转人工",user:"jiajia",desc:"退费承诺风险拦截",status:"需人工",progress:36,icon:"shield-alert"},
+  {name:"用户分层与跟进",user:"xiaolin",desc:"画像、标签与专属话术",status:"已生成",progress:88,icon:"chart-no-axes-combined"}
+];
+
+const sopSteps = [
+  {name:"欢迎破冰",trigger:"新用户入群 / 首次私聊",time:"立即",talk:"识别届数、目标院校与专业",handoff:"要求人工、投诉"},
+  {name:"需求识别",trigger:"用户回复个人情况",time:"10 分钟",talk:"已定院校推班型；未定给规划表",handoff:"深度择校咨询"},
+  {name:"课程与价格",trigger:"价格 / 师资 / 优惠",time:"5 分钟",talk:"检索知识库报价，不编造",handoff:"退费、书面承诺"},
+  {name:"试听邀约",trigger:"犹豫 / 比价 / 试听需求",time:"1 天",talk:"免费试听降低决策门槛",handoff:"无"},
+  {name:"沉默激活",trigger:"3 天未互动 / 未转化",time:"3 天",talk:"回放引导 + 新班型介绍",handoff:"明确拒绝跟进"}
+];
+
+const pageTitles = {
+  workspace:"运营工作台", chat:"客户对话", profile:"用户画像", sop:"SOP 流程", quality:"话术与质检", simulator:"客户端模拟"
+};
+
+let activeUserId = "xiaolin";
+let activeScenario = "试听转化";
+let selectedReply = 0;
+let customMode = false;
+let timeValue = 1;
+let currentSopIndex = 3;
+
+function icons(){ if(window.lucide) lucide.createIcons(); }
+
+function showToast(text){
+  const toast = document.querySelector("#toast");
+  toast.querySelector("span").textContent = text;
+  toast.classList.add("show");
+  clearTimeout(window.toastTimer);
+  window.toastTimer = setTimeout(()=>toast.classList.remove("show"),2600);
 }
-function interruptedMarkup(page){
- const kind=page==='workspace'?'ticket':page==='operations'?'package':null;
- if(!kind)return '';
- const rows=(state.data?.interrupted_artifacts||[]).filter(x=>x.kind===kind);
- if(!rows.length)return '';
- return `<div class="section-title"><h2>中断的历史产物</h2><span class="subtle">只读 · 不可交付</span></div><section class="card panel"><p class="subtle">这些记录在任务中断后产生，已隔离。可以重新运行原始输入，生成新的记录。</p>${rows.map((r,i)=>`<div class="item"><div class="item-head"><strong>${esc(r.id||r.run_id)}</strong><span class="tag amber">已隔离</span></div><p>${esc(kind==='ticket'?r.message:r.day)}</p><button class="button secondary" data-retry-kind="${kind}" data-retry-index="${i}" ${state.busy||!(kind==='ticket'?r.message:r.day)?'disabled':''}>重新运行</button></div>`).join('')}</section>`;
+
+function goToPage(page){
+  document.querySelectorAll(".nav-item").forEach(el=>el.classList.toggle("active",el.dataset.page===page));
+  document.querySelectorAll(".page").forEach(el=>el.classList.toggle("active",el.id===`page-${page}`));
+  document.querySelector("#page-title").textContent = pageTitles[page] || "运营工作台";
+  window.scrollTo({top:0,behavior:"smooth"});
+  icons();
 }
-const tickets = () => state.data?.tickets || [];
-const packages = () => state.data?.packages || [];
-const approvals = () => [...tickets().filter(t=>t.gate7==='PENDING' || t.gate7==='SIMULATED_APPROVAL' || t.human_task?.status==='PENDING' || (t.human_task?.status!=='COMPLETED' && t.review?.status && t.review.status!=='PASS')).map(t=>({...t,kind:'ticket',status:t.gate7==='PENDING'?'PENDING':t.review?.status && t.review.status!=='PASS'?'REVIEW_REQUIRED':t.human_task?.status==='PENDING'?'HUMAN_REVIEW':t.gate7,title:`工单 ${t.id}`,summary:t.message,reason:t.human_task?.reason||t.risk_reason,advice:t.escalation,content:t.review_candidate,content_hash:t.content_hash||t.gate7_decision?.content_hash})),...packages().filter(p=>p.status==='PENDING_APPROVAL').map(p=>({...p,kind:'package',title:`运营包 ${p.day}`,summary:p.day,content_hash:p.content_hash}))];
-const dayOptions = () => state.data?.sop_days || [];
-function statusMessage() { return state.error ? `<div class="notice error">${esc(state.error)}</div>` : ''; }
-function dashboard(){
- const ts=tickets(), ps=packages(), as=approvals(), risk=ts.filter(t=>t.risk_level==='L3').length;
- const events=ts.slice(0,5).map(t=>`<div class="event"><strong>${esc(t.risk_level||'工单')} · ${esc(t.action||'已归档')}</strong><small>${esc(t.time||'')} &nbsp; ${esc(t.id||'')}</small></div>`).join('');
- const nodes=[['01','数据增长','分析与分层'],['02','数据增长','制定跟进计划'],['03','服务运营','准备内容'],['04','强制审核','审核与修复'],['05','服务运营','草稿与反馈']];
- return head('COMPANY OVERVIEW','总览指挥舱','一人指挥，多 Agent 协作。让每一次业务流转都有迹可循。','<button class="button" data-go="workspace">＋ 处理家长消息</button>')+statusMessage()+
- `<div class="metrics">${metric('累计工单',ts.length,'本地已归档记录','↗')}${metric('待人工处理',as.length,'审批及复核队列','◇')}${metric('运营包',ps.length,'本地生成记录','▦')}${metric('L3 风险工单',risk,'需要关注的高风险事件','!')}</div>
- <div class="grid"><section class="card panel">${panelHead('两个 Agent · 一条协作链','共享业务数据 · 独立审核步骤 · 人工决策','<span class="tag">WORKFLOW</span>')}<div class="workflow">${nodes.map(n=>`<div class="flow-node"><i>${n[0]}</i><strong>${n[1]}</strong><small>${n[2]}</small></div>`).join('')}</div><div class="flow-note"><b>●</b> 流程示意 · 审核后须人工审批，草稿与反馈回流分析</div></section>
- <section class="card panel">${panelHead('最近工单','本地归档记录','<span class="tag">RECENT</span>')}<div class="event-list">${events||empty('暂无工单','从工作台开始处理第一条消息。')}</div></section></div>
- <div class="section-title"><h2>业务交付物</h2><span class="subtle">BUSINESS OUTPUTS</span></div><div class="deliverables"><div class="card delivery"><div class="label">01 / SERVICE</div><strong>家长客服工单</strong><p>${ts.length} 条记录 · 可追踪风险与审核</p></div><div class="card delivery"><div class="label">02 / OPERATIONS</div><strong>每日运营包</strong><p>${ps.length} 个记录 · SOP 驱动生成</p></div><div class="card delivery"><div class="label">03 / INSIGHTS</div><strong>经营周报</strong><p>基于结构化工单计算</p></div></div>`;
+
+function renderScenarios(){
+  document.querySelector("#scenario-list").innerHTML = scenarios.map((s,i)=>{
+    const u = users[s.user];
+    return `<div class="scenario-row" data-scenario="${s.name}" data-user="${s.user}">
+      <div class="scenario-icon"><i data-lucide="${s.icon}"></i></div>
+      <div><strong>${s.name}</strong><small>${s.desc}</small></div>
+      <div class="scenario-user"><img src="${u.avatar}" alt="${u.name}"><span>${u.name}</span></div>
+      <div><small>${s.status}</small><div class="progress-mini"><span style="width:${s.progress}%"></span></div></div>
+      <button class="icon-button" title="打开场景"><i data-lucide="arrow-up-right"></i></button>
+    </div>`;
+  }).join("");
+  document.querySelectorAll(".scenario-row").forEach(row=>row.addEventListener("click",()=>{
+    activeUserId=row.dataset.user;
+    activeScenario=row.dataset.scenario;
+    renderChat();
+    goToPage("chat");
+  }));
+
+  document.querySelector("#sim-scenarios").innerHTML = scenarios.map(s=>`<button class="sim-scenario ${s.name===activeScenario?"active":""}" data-sim-scenario="${s.name}"><i data-lucide="${s.icon}"></i>${s.name}</button>`).join("");
+  document.querySelectorAll("[data-sim-scenario]").forEach(btn=>btn.addEventListener("click",()=>{
+    activeScenario=btn.dataset.simScenario;
+    const match=scenarios.find(s=>s.name===activeScenario);
+    if(match) activeUserId=match.user;
+    renderSimulator();
+  }));
 }
-function workspace(){
- const t=state.ticket || tickets()[0];
- let detail=t?`${panelHead('执行结果',t.id||'工单详情',tag(t.review?.status))}${block('家长消息',t.message)}${block('前台初稿',t.draft)}${block('合规审核',t.review?.reason || (t.review_history||[]).map(h=>`第 ${h.round} 轮：${(h.violations||[]).map(v=>v.type+ ' ' + (v.original||'')).join('、')||'无违规'}`).join('\n') || '历史记录缺少结构化审核信息')}${block('风险与处置',`${t.risk_level||'未知'} · ${t.risk_reason||''}\n${t.action||''}`)}${block('最终回复',t.review?.status==='PASS' ? (t.reply || '尚未获准交付') : '历史或待复核记录，当前版本未验证，不可作为交付凭证。')}`:empty('等待新的业务事件','提交家长消息后，执行结果和审核记录将在这里显示。');
- return head('AGENT WORKSPACE','Agent 工作台','把一条业务消息交给团队，查看每一步处理结果。')+statusMessage()+`<div class="two-col"><section class="card panel">${panelHead('发起客服任务','输入消息，启动客服与合规流程')}<form id="service-form"><label class="field-label" for="customer">客户记录</label><select id="customer"><option value="">新建入站客户（默认不具触达同意）</option>${(state.workflow?.analysis?.customers||[]).map(c=>`<option value="${esc(c.customer_id)}">${esc(c.customer_id)} · ${esc(c.source)} · ${c.consent?'已记录同意':'未记录同意'}</option>`).join('')}</select><label class="field-label" for="message" style="margin-top:16px">家长消息</label><textarea id="message" required maxlength="5000" placeholder="例如：孩子不愿意坚持阅读，该怎么办？"></textarea><div class="chips"><button type="button" class="chip" data-example="这个课程可以按月购买吗？">价格异议</button><button type="button" class="chip" data-example="孩子阅读效果不明显，怎么办？">效果质疑</button><button type="button" class="chip" data-example="我要退款，请尽快处理。">退款投诉</button><button type="button" class="chip" data-example="这个课程适合几岁的孩子？">正常咨询</button></div><button class="button wide" ${state.busy?'disabled':''}>${state.busy?'正在处理，请稍候…':'开始处理 →'}</button></form><div class="notice" style="margin:16px 0 0">高风险及未通过审核的内容会进入人工处理，不会自动对外发送。</div></section><section class="card panel">${detail}</section></div>`;
+
+function renderFollowList(){
+  document.querySelector("#dashboard-follow-list").innerHTML = Object.values(users).map(u=>`
+    <button class="follow-card" data-follow-user="${u.id}">
+      <img src="${u.avatar}" alt="${u.name}">
+      <div><strong>${u.name} · ${u.tier}</strong><span>${u.advice.slice(0,34)}...</span></div>
+      <span class="tag ${u.id==="jiajia"?"amber":u.id==="zhouzhou"?"blue":""}">${u.tags[0]}</span>
+    </button>`).join("");
+  document.querySelectorAll("[data-follow-user]").forEach(btn=>btn.addEventListener("click",()=>{
+    activeUserId=btn.dataset.followUser;
+    renderChat();
+    goToPage("chat");
+  }));
 }
-function operations(){
- const days=dayOptions(), p=state.package || packages()[0];
- const options=days.map(d=>{let value=typeof d==='string'?d:d.day||d.name;return `<option value="${esc(value)}">${esc(value)}</option>`}).join('');
- const tasks=p?.tasks||[];
- return head('OPERATIONS CENTER','运营中心','将营期 SOP 转化为逐项审核的日度运营包。')+statusMessage()+`<div class="two-col"><section class="card panel">${panelHead('生成运营包','选择营期日，逐条生成并审核')}<form id="sop-form"><label class="field-label" for="day">营期日</label><select id="day" required>${options||'<option value="">暂无可用 SOP</option>'}</select><p class="subtle" style="margin:12px 0 18px">每项任务独立生成并审核；缺项或未审批时不可交付。</p><button class="button wide" ${state.busy||!days.length?'disabled':''}>${state.busy?'正在生成，请稍候…':'生成当日运营包 →'}</button></form></section><section class="card panel">${p?`${panelHead('运营包详情',p.day||'',tag(p.status||p.decision?.status))}${tasks.length?tasks.map((x,i)=>`<div class="item"><div class="item-head"><strong>任务 ${i+1} · ${esc(x.task?.time||'')} ${esc(x.task?.channel||'')}</strong>${tag(x.review?.status)}</div><p>${esc(x.task?.audience||'')}</p><div class="prose">${esc(x.review?.content||x.review?.reason||'暂无内容')}</div></div>`).join(''):block('内容',p.content||'暂无结构化任务记录')}`:empty('暂无运营包','选择营期日开始生成。')}</section></div>`;
+
+function renderCustomerCards(){
+  document.querySelector("#customer-cards").innerHTML = Object.values(users).map(u=>`
+    <button class="customer-card ${u.id===activeUserId?"active":""}" data-customer="${u.id}">
+      <img src="${u.avatar}" alt="${u.name}">
+      <div><strong>${u.name}</strong><span>${u.conversation[u.conversation.length-1].text}</span></div>
+      <time>${u.time}</time>
+    </button>`).join("");
+  document.querySelectorAll("[data-customer]").forEach(btn=>btn.addEventListener("click",()=>{
+    activeUserId=btn.dataset.customer;
+    selectedReply=0;
+    customMode=false;
+    renderChat();
+  }));
 }
-function growth(){
- const w=state.workflow||{}, analysis=w.analysis||{}, runs=(w.runs||[]).filter(r=>r.type==='FOLLOWUP_BATCH');
- const batch=state.batch||runs[0]?.id, run=runs.find(r=>r.id===batch), tasks=(w.tasks||[]).filter(t=>t.batch_id===batch), artifacts=(w.artifacts||[]).filter(a=>a.batch_id===batch), artifact=artifacts[0], approval=(w.approvals||[]).find(a=>a.batch_id===batch), drafts=(w.drafts||[]).filter(d=>tasks.some(t=>t.id===d.task_id)), trace=(w.trace||[]).filter(t=>t.run_id===batch);
- let review={};try{review=typeof artifact?.review==='string'?JSON.parse(artifact.review):artifact?.review||{}}catch{}
- const eligible=tasks.filter(t=>t.status==='WAITING_CONTENT'), recipients=artifact?.approval_recipients, canApprove=artifact?.material_hash&&review.status==='PASS'&&Array.isArray(recipients)&&recipients.length>0;
- const safeBusy=state.busy?'disabled':'';
- return head('GROWTH LOOP','增长协作','数据增长 Agent 分析并规划，服务运营 Agent 生成内容、执行强制审核并留存草稿和反馈。')+statusMessage()+`<div class="notice">模拟演示：客户档案和互动事件为合成数据；系统仅生成本地草稿与模拟回执，不连接真实发送渠道。</div>
- <div class="metrics">${metric('模拟客户',analysis.total??0,'数据增长 · 当前分析样本','◎')}${metric('三天未互动',analysis.inactive??0,'依最近互动日期统计','◷')}${metric('跟进批次',runs.length,'数据增长 · 计划记录','↗')}${metric('本地草稿',(w.drafts||[]).length,'服务运营 · 未对外发送','▤')}</div>
- <div class="grid"><section class="card panel">${panelHead('01 / 数据增长 · 数据分析',esc(analysis.definition||'尚无分析数据'))}<div class="detail-actions"><button class="button secondary" data-workflow="seed" ${safeBusy}>载入模拟客户</button><button class="button" data-workflow="plan" ${state.busy||!analysis.total?'disabled':''}>制定跟进计划 →</button></div><p class="subtle" style="margin-top:12px">统计日期 ${esc(analysis.as_of||'—')}；同意状态和触达次数会影响行动。</p></section><section class="card panel">${panelHead('02 / 数据增长 · 选择批次','计划由可复算数据生成')}<select id="batch-select"><option value="">选择批次</option>${runs.map(r=>`<option value="${esc(r.id)}" ${r.id===batch?'selected':''}>${esc(r.id)} · ${esc(label(r.status))}</option>`).join('')}</select><p class="subtle" style="margin-top:12px">${run?`本批次 ${tasks.length} 个任务：${eligible.length} 个待生成内容。`:'生成计划后可查看任务。'}</p></section></div>
- <div class="section-title"><h2>批次执行 <span class="subtle">${esc(batch||'尚未选择')}</span></h2></div><div class="two-col"><section class="card panel">${panelHead('任务与执行记录','根据同意状态、频次与互动情况决定行动')}${tasks.length?tasks.map(t=>`<div class="item"><div class="item-head"><strong>${esc(t.customer_id)} · ${esc(t.action)}</strong>${tag(t.status)}</div><p>${esc(t.reason)}</p><small>${esc(t.owner)}</small></div>`).join(''):empty('暂无任务','先载入模拟客户并制定计划。')}<div class="detail-block"><h3>协作轨迹</h3>${trace.length?trace.slice().reverse().map(t=>`<div class="event"><strong>${esc(t.owner)} · ${esc(t.action)} · ${esc(label(t.status))}</strong><small>${esc(t.at)}</small></div>`).join(''):'<span class="subtle">暂无轨迹</span>'}</div></section>
- <div class="stack"><section class="card panel">${panelHead('03 / 服务运营 · 内容与强制审核','生成内容并独立审核')}<button class="button secondary" data-workflow="content" ${state.busy||!eligible.length?'disabled':''}>生成并审核内容</button>${artifact?`${block('当前版本',artifact.content)}${block('审核结果',`${label(review.status)}\n${review.reason||''}`)}`:block('当前版本','尚未生成内容')}</section>
- <section class="card panel">${panelHead('04 / 老板 · 审批','确认正文与完整名单后决策',tag(approval?.status||'PENDING'))}${block('待审批名单',Array.isArray(recipients)?`${recipients.length} 人\n${recipients.join('\n')}`:'当前没有可验证的完整审批名单') }<div class="detail-actions"><button class="button" data-workflow="approve" data-decision="APPROVED" ${state.busy||!canApprove?'disabled':''}>批准正文和名单</button><button class="button danger" data-workflow="approve" data-decision="REJECTED" ${state.busy||!canApprove?'disabled':''}>打回</button></div><p class="subtle" style="margin-top:12px">名单由服务端按审批材料完整提供；只有与当前正文和名单绑定的真实批准可创建草稿。</p></section>
- <section class="card panel">${panelHead('05 / 服务运营 · 草稿与反馈','仅本地草稿和模拟送达')}<button class="button secondary" data-workflow="queue" ${state.busy||approval?.status!=='APPROVED'||!eligible.length?'disabled':''}>创建本地草稿</button>${drafts.length?drafts.map(d=>`<div class="item"><div class="item-head"><strong>${esc(d.id)}</strong>${tag(d.status)}</div><p>任务 ${esc(d.task_id)}</p><button class="chip" data-receipt="${esc(d.id)}" ${state.busy||d.status!=='DRAFT'?'disabled':''}>记录模拟回执</button></div>`).join(''):'<p class="subtle" style="margin-top:12px">暂无草稿。</p>'}</section></div></div>`;
+
+function renderMessages(){
+  const u=users[activeUserId];
+  const stage=document.querySelector("#message-stage");
+  stage.innerHTML=u.conversation.map(m=>{
+    if(m.type==="day") return `<div class="day-divider">${m.text}</div>`;
+    const cls=m.type==="user"?"user":m.type==="system"?"system":"";
+    const img=m.type==="user"?u.avatar:assets+"brand-mark.png";
+    return `<div class="message ${cls}"><img class="bubble-avatar" src="${img}" alt=""><div><div class="meta">${m.type==="user"?u.name:"服务运营智能体"}</div><div class="bubble">${m.text}</div></div></div>`;
+  }).join("");
+  stage.scrollTop=stage.scrollHeight;
 }
-function risk(){
- const items=approvals(); const selected=items.find((x,i)=>String(x.id??i)===String(state.selected))||items[0];
- const packageContent=selected?.kind==='package'?packageMaterial(selected):null;
- const canReject=selected?.content_hash && (selected.kind==='ticket'?selected.gate7==='PENDING':selected.status==='PENDING_APPROVAL'&&packageContent!==null);
- const canApprove=canReject && (selected.kind!=='ticket'||selected.review?.status==='PASS');
- const history=packages().filter(p=>p.status!=='PENDING_APPROVAL');
- const human=selected?.kind==='ticket'&&selected.human_task?.status==='PENDING';
- const canResolve=human&&(selected.risk_level!=='L3'||['APPROVED','REJECTED','REVIEW_REQUIRED'].includes(selected.gate7));
- return head('RISK & APPROVAL','风控与审批','高风险事项与未通过审核的内容，交由人来决定。')+statusMessage()+`<div class="two-col"><section class="card panel">${panelHead('待处理队列',`${items.length} 项需要关注`)}${items.length?items.map((x,i)=>`<button class="item wide ${selected?.id===x.id?'selected':''}" data-select="${esc(x.id??i)}" style="text-align:left"><div class="item-head"><strong>${esc(x.title||x.id||'待处理事项')}</strong>${tag(x.status||'PENDING')}</div><p>${esc(x.summary||x.message||x.reason||'需要人工处理')}</p><small>${esc(x.time||'')}</small></button>`).join(''):empty('队列已清空','目前没有待处理事项。')}</section><section class="card panel">${selected?`${panelHead('事项详情','请核对内容后作出决定',tag(selected.status||'PENDING'))}${block('事件原文',selected.message||selected.summary)}${block('风险分析',selected.reason||selected.risk_reason)}${block('Agent 建议',selected.advice||selected.escalation)}${block(selected.kind==='package'?'完整审批材料':'待审内容',selected.kind==='package'?(packageContent||'材料字段不完整，无法核验。'):(selected.content||selected.reply||selected.review_candidate))}<div class="detail-actions"><button class="button" data-approve="approve" ${canApprove?'':'disabled'}>批准</button><button class="button danger" data-approve="reject" ${canReject?'':'disabled'}>打回</button></div><p class="subtle" style="margin-top:12px">${canApprove?'审批绑定当前材料；系统不会自动向外发送。':canReject?'审核未通过，可打回，不能批准。':'当前事项不可审批。'}</p>${human?`<div class="detail-block"><h3>人工处理 · ${esc(selected.human_task.owner||'负责人')}</h3><form id="human-task-form"><label class="field-label" for="human-result">记录处理结果</label><textarea id="human-result" maxlength="5000" required placeholder="填写已完成的人工处理结果" ${canResolve?'':'disabled'}></textarea><button class="button secondary" style="margin-top:10px" ${!canResolve||state.busy?'disabled':''}>记录并完成任务</button></form><p class="subtle" style="margin-top:10px">${canResolve?'仅记录处理结果，不表示已发送或退款。':'高风险事项须先批准或打回，再记录人工处理。'}</p></div>`:''}`:empty('选择一个事项','在左侧查看需要人工处理的事件。')}</section></div><div class="section-title"><h2>运营包历史结果</h2><span class="subtle">不计入待处理队列</span></div><section class="card panel">${history.length?history.map(p=>`<div class="item"><div class="item-head"><strong>${esc(p.day||p.id)}</strong>${tag(p.status)}</div><p>记录编号：${esc(p.id)}</p></div>`).join(''):empty('暂无历史结果','已处理或未完成的运营包将显示在这里。')}</section>`;
+
+function renderReplyOptions(){
+  const u=users[activeUserId];
+  document.querySelector("#reply-options").innerHTML=u.replies.map((r,i)=>`
+    <button class="reply-option ${selectedReply===i&&!customMode?"selected":""}" data-reply-index="${i}">
+      <b>${r.label}</b>${r.text}
+      <span class="quality-line"><i data-lucide="shield-check"></i>${r.quality}</span>
+    </button>`).join("");
+  document.querySelectorAll("[data-reply-index]").forEach(btn=>btn.addEventListener("click",()=>{
+    selectedReply=Number(btn.dataset.replyIndex);
+    customMode=false;
+    renderReplyOptions();
+  }));
+  const alert=document.querySelector("#risk-alert");
+  alert.classList.toggle("hidden",!u.risk);
+  if(u.risk) document.querySelector("#risk-text").textContent="识别到“随时退款”等承诺性表达，候选回复必须由运营老师人工审核后发送。";
+  const send=document.querySelector("#send-reply");
+  send.innerHTML=u.risk?'<i data-lucide="user-check"></i>确认合规并发送':'<i data-lucide="send"></i>审核并发送';
+  icons();
 }
-function analytics(){
- const ts=tickets(), total=ts.length, counts=['L1','L2','L3'].map(l=>ts.filter(t=>t.risk_level===l).length);
- const bars=counts.map((n,i)=>`<div class="bar-row"><span>L${i+1}</span><div class="bar"><i style="width:${total?n/total*100:0}%"></i></div><span>${n}</span></div>`).join('');
- return head('BUSINESS INTELLIGENCE','经营分析','用可核对的记录理解业务与人工介入情况。',`<button class="button secondary" id="generate-report" ${state.busy?'disabled':''}>${state.busy?'正在生成…':'生成经营周报 ↗'}</button>`)+statusMessage()+`<div class="metrics">${metric('工单总数',total,'本地全部工单','▤')}${metric('L3 高风险',counts[2],'按已归档工单计算','◇')}${metric('待人工处理',approvals().length,'当前队列','◷')}${metric('运营包',packages().length,'本地记录数','▦')}</div><div class="grid"><section class="card panel">${panelHead('风险等级分布','按本地工单统计，不包含无等级记录')}${bars}<p class="subtle">样本总数：${total} · 统计口径为当前本地记录</p></section><section class="card panel">${panelHead('经营周报','近七日结构化工单')}<div class="prose">${esc(state.report||state.data?.report||'点击上方按钮生成周报。')}</div></section></div>`;
+
+function renderChatProfile(){
+  const u=users[activeUserId];
+  document.querySelector("#chat-profile").innerHTML=`
+    <div class="profile-identity"><img src="${u.avatar}" alt="${u.name}"><strong>${u.name}</strong><span>${u.context}</span></div>
+    <div class="profile-score">${u.scores.map(s=>`<div class="score-cell"><strong>${s[1]}</strong><span>${s[0]}</span></div>`).join("")}</div>
+    <div class="mini-section"><strong>最近行为概括</strong><p>${u.summary}</p></div>
+    <div class="mini-section"><strong>AI 标签</strong><div>${u.tags.map((t,i)=>`<span class="tag ${i%2?"blue":""}">${t}</span>`).join("")}</div></div>
+    <div class="mini-section"><strong>人工备注</strong><p>${u.manual}</p></div>
+    <div class="mini-section"><strong>下一建议</strong><p>${u.advice}</p></div>`;
 }
-function render(){document.querySelector('#breadcrumb').textContent=names[state.page];document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.page===state.page));app.innerHTML=({dashboard,workspace,growth,operations,risk,analytics}[state.page])()+interruptedMarkup(state.page);bind();bindGrowth();bindHumanTask();bindRetry();}
-function toast(message){const el=document.querySelector('#toast');el.textContent=message;el.classList.add('visible');setTimeout(()=>el.classList.remove('visible'),3500)}
-async function request(path,body){const response=await fetch(path,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let data;try{data=await response.json()}catch{throw Error('服务返回了无法读取的数据')}if(!response.ok)throw Error(data.detail||data.error||`请求失败 (${response.status})`);return data}
-async function refresh(){try{[state.data,state.workflow]=await Promise.all([request('/api/state'),request('/api/workflow')]);if(state.ticket?.id)state.ticket=tickets().find(t=>t.id===state.ticket.id)||state.ticket;if(state.package?.id)state.package=packages().find(p=>p.id===state.package.id)||state.package;state.error='';document.querySelector('#connection').textContent='已连接'}catch(e){state.error='无法连接本地服务：'+e.message;document.querySelector('#connection').textContent='未连接'}render()}
-async function perform(path,body,onSuccess){state.busy=true;state.error='';render();try{let result=await request(path,body);if(result.job_id){const jobId=result.job_id;do{await new Promise(resolve=>setTimeout(resolve,1000));result=await request(`/api/jobs/${encodeURIComponent(jobId)}`);if(result.status==='failed')throw Error(result.error||'任务执行失败')}while(result.status!=='completed');result=result.result}onSuccess(result);await refresh();toast('操作完成')}catch(e){state.error=e.message}finally{state.busy=false;render()}}
-function bind(){app.querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>go(el.dataset.go));app.querySelectorAll('[data-example]').forEach(el=>el.onclick=()=>{document.querySelector('#message').value=el.dataset.example});app.querySelector('#service-form')?.addEventListener('submit',e=>{e.preventDefault();const message=document.querySelector('#message').value.trim(),customer_id=document.querySelector('#customer').value;if(message)perform('/api/service',{message,customer_id},r=>state.ticket=r.ticket||r)});app.querySelector('#sop-form')?.addEventListener('submit',e=>{e.preventDefault();perform('/api/sop',{day:document.querySelector('#day').value},r=>{const p=r.package||r;state.package={...p,id:p.id||(p.path||'').split(/[\\/]/).pop().replace(/\.md$/,'')}})});app.querySelector('#generate-report')?.addEventListener('click',()=>perform('/api/report',{},r=>state.report=r.report||r.content||r));app.querySelectorAll('[data-select]').forEach(el=>el.onclick=()=>{state.selected=el.dataset.select;render()});app.querySelectorAll('[data-approve]').forEach(el=>el.onclick=()=>{const item=approvals().find((x,i)=>String(x.id??i)===String(state.selected))||approvals()[0];if(item)perform('/api/approvals',{kind:item.kind,id:item.id,decision:el.dataset.approve,content_hash:item.content_hash},()=>{})});}
-function bindGrowth(){app.querySelector('#batch-select')?.addEventListener('change',e=>{state.batch=e.target.value;render()});app.querySelectorAll('[data-workflow]').forEach(el=>el.onclick=()=>{const action=el.dataset.workflow;const batch=state.batch||(state.workflow?.runs||[]).find(r=>r.type==='FOLLOWUP_BATCH')?.id;const artifact=(state.workflow?.artifacts||[]).find(a=>a.batch_id===batch);const body=action==='seed'||action==='plan'?{}:action==='content'?{batch_id:batch}:action==='approve'?{batch_id:batch,artifact_id:artifact?.id,decision:el.dataset.decision,material_hash:artifact?.material_hash}:{batch_id:batch,artifact_id:artifact?.id};perform(`/api/workflow/${action}`,body,r=>{if(action==='plan')state.batch=r.batch_id})});app.querySelectorAll('[data-receipt]').forEach(el=>el.onclick=()=>perform('/api/workflow/receipt',{draft_id:el.dataset.receipt},()=>{}))}
-function bindHumanTask(){app.querySelector('#human-task-form')?.addEventListener('submit',e=>{e.preventDefault();const item=approvals().find((x,i)=>String(x.id??i)===String(state.selected))||approvals()[0];const result=document.querySelector('#human-result').value.trim();if(item&&result)perform('/api/human-tasks',{id:item.id,result},()=>{})})}
-function bindRetry(){app.querySelectorAll('[data-retry-kind]').forEach(el=>el.onclick=()=>{const kind=el.dataset.retryKind;const item=(state.data?.interrupted_artifacts||[]).filter(x=>x.kind===kind)[Number(el.dataset.retryIndex)];if(!item)return;if(kind==='ticket'&&item.message)perform('/api/service',{message:item.message,customer_id:item.customer_id||''},r=>state.ticket=r.ticket||r);if(kind==='package'&&item.day)perform('/api/sop',{day:item.day},r=>{const p=r.package||r;state.package={...p,id:p.id||(p.path||'').split(/[\\/]/).pop().replace(/\.md$/,'')}})})}
-function go(page){state.page=page;state.error='';history.replaceState(null,'',`#${page}`);render();window.scrollTo(0,0)}
-document.querySelectorAll('.nav').forEach(el=>el.onclick=()=>go(el.dataset.page));document.querySelector('#refresh').onclick=refresh;
-if(names[location.hash.slice(1)])state.page=location.hash.slice(1);
-refresh();
+
+function renderChat(){
+  const u=users[activeUserId];
+  document.querySelector("#active-avatar").src=u.avatar;
+  document.querySelector("#active-avatar").alt=u.name;
+  document.querySelector("#active-name").textContent=u.name;
+  document.querySelector("#active-context").textContent=u.context;
+  renderCustomerCards();
+  renderMessages();
+  renderReplyOptions();
+  renderChatProfile();
+  renderSimulator();
+  icons();
+}
+
+function renderProfileList(){
+  document.querySelector("#profile-user-list").innerHTML=Object.values(users).map(u=>`
+    <button class="profile-user-card ${u.id===activeUserId?"active":""}" data-profile-user="${u.id}">
+      <img src="${u.avatar}" alt="${u.name}">
+      <div><strong>${u.name} · ${u.tier}</strong><span>${u.tags.slice(0,3).join(" · ")}</span></div>
+    </button>`).join("");
+  document.querySelectorAll("[data-profile-user]").forEach(btn=>btn.addEventListener("click",()=>{
+    activeUserId=btn.dataset.profileUser;
+    renderProfileList();
+    renderProfileDetail();
+    renderSimulator();
+    icons();
+  }));
+}
+
+function renderProfileDetail(){
+  const u=users[activeUserId];
+  document.querySelector("#profile-detail").innerHTML=`
+    <div class="profile-hero">
+      <img src="${u.avatar}" alt="${u.name}">
+      <div><h2>${u.name}</h2><p>${u.context} · ${u.status}</p><div>${u.tags.slice(0,3).map((t,i)=>`<span class="tag ${i===1?"blue":i===2?"amber":""}">${t}</span>`).join("")}</div></div>
+      <div class="layer-badge"><span>建议分层</span><strong>${u.tier}</strong></div>
+    </div>
+    <div class="profile-columns">
+      <section class="profile-block">
+        <h3>最近行为概括</h3>
+        <div class="behavior-summary">${u.summary}</div>
+        <div style="margin-top:10px">${u.behavior.map(b=>`<div class="data-source"><i data-lucide="${b[0]}"></i><div><strong>${b[1]}</strong><span>${b[2]}</span></div></div>`).join("")}</div>
+      </section>
+      <div>
+        <section class="profile-block">
+          <h3>标签与人工备注</h3>
+          <div class="tag-editor">
+            ${u.tags.map((t,i)=>`<span class="tag-chip ${i===3?"manual":""}">${i===3?'<i data-lucide="user-round-pen"></i>':""}${t}<button title="删除标签"><i data-lucide="x"></i></button></span>`).join("")}
+            <button class="add-tag">+ 人工备注标签</button>
+          </div>
+          <div class="data-source" style="margin-top:12px"><i data-lucide="notebook-pen"></i><div><strong>运营老师备注</strong><span>${u.manual}</span></div></div>
+        </section>
+        <section class="profile-block" style="margin-top:12px">
+          <h3>转化阶段与数据</h3>
+          ${u.scores.map(s=>`<div class="data-source"><i data-lucide="chart-spline"></i><div><strong>${s[0]} · ${s[1]}</strong><span>${s[0]==="转化阶段"?"基于当前 SOP 状态机":"基于近 7 天行为动态计算"}</span></div></div>`).join("")}
+        </section>
+      </div>
+    </div>
+    <div class="recommendation">
+      <i data-lucide="sparkles"></i>
+      <div><strong>分层建议与专属话术</strong><span>${u.advice}</span><span style="background:#fff;padding:9px;border-radius:6px;margin-top:8px;color:#4e4358">“${u.script}”</span></div>
+      <button class="button primary" id="copy-script"><i data-lucide="copy"></i>使用话术</button>
+    </div>`;
+  document.querySelector("#copy-script").addEventListener("click",()=>{
+    document.querySelector("#custom-reply-input").value=u.script;
+    customMode=true;
+    showToast("专属话术已带入自定义回复");
+    goToPage("chat");
+    renderReplyOptions();
+  });
+  icons();
+}
+
+function renderSop(){
+  document.querySelector("#sop-flow").innerHTML=sopSteps.map((s,i)=>`
+    <article class="sop-card">
+      <div class="sop-num">0${i+1}</div>
+      <h3>${s.name}</h3>
+      <p>${s.talk}</p>
+      <div class="sop-meta">
+        <span><i data-lucide="zap"></i>${s.trigger}</span>
+        <span><i data-lucide="timer"></i>${s.time}</span>
+        <span><i data-lucide="user-round-cog"></i>${s.handoff}</span>
+      </div>
+    </article>`).join("");
+  document.querySelector("#sop-step-select").innerHTML=sopSteps.map((s,i)=>`<option value="${i}">${s.name}</option>`).join("");
+}
+
+function renderSimulator(){
+  const u=users[activeUserId];
+  document.querySelector("#sim-user-buttons").innerHTML=Object.values(users).map(x=>`<button class="sim-user ${x.id===activeUserId?"active":""}" data-sim-user="${x.id}"><img src="${x.avatar}" alt="${x.name}" title="${x.name}"></button>`).join("");
+  document.querySelectorAll("[data-sim-user]").forEach(btn=>btn.addEventListener("click",()=>{
+    activeUserId=btn.dataset.simUser;
+    renderSimulator();
+  }));
+  const visible=u.conversation.filter(m=>m.type!=="day").slice(-8);
+  document.querySelector("#phone-messages").innerHTML=visible.map(m=>`
+    <div class="phone-message ${m.type==="user"?"mine":""}"><div class="bubble">${m.text}</div><time>${m.type==="user"?"09:42":"09:43"}</time></div>`).join("");
+  document.querySelectorAll("[data-sim-scenario]").forEach(btn=>btn.classList.toggle("active",btn.dataset.simScenario===activeScenario));
+  icons();
+}
+
+function openModal(id){ document.querySelector(id).classList.remove("hidden"); icons(); }
+function closeModals(){ document.querySelectorAll(".modal-layer").forEach(m=>m.classList.add("hidden")); }
+
+document.addEventListener("DOMContentLoaded",()=>{
+  renderScenarios();
+  renderFollowList();
+  renderSop();
+  renderChat();
+  renderProfileList();
+  renderProfileDetail();
+  renderSimulator();
+  icons();
+
+  document.querySelector("#mobile-menu").addEventListener("click",()=>document.querySelector(".sidebar").classList.toggle("open"));
+  document.querySelectorAll(".nav-item").forEach(btn=>btn.addEventListener("click",()=>{goToPage(btn.dataset.page);document.querySelector(".sidebar").classList.remove("open");}));
+  document.querySelectorAll("[data-page-jump]").forEach(btn=>btn.addEventListener("click",()=>goToPage(btn.dataset.pageJump)));
+  document.querySelectorAll(".jump-chat").forEach(btn=>btn.addEventListener("click",()=>goToPage("chat")));
+
+  document.querySelector("#open-import").addEventListener("click",()=>openModal("#import-modal"));
+  document.querySelectorAll(".close-modal").forEach(btn=>btn.addEventListener("click",closeModals));
+  document.querySelectorAll(".modal-layer").forEach(layer=>layer.addEventListener("click",e=>{if(e.target===layer) closeModals();}));
+  document.querySelector("#confirm-import").addEventListener("click",()=>{
+    closeModals();
+    showToast("公司 SOP 已解析并上线");
+    goToPage("sop");
+  });
+
+  document.querySelector("#simulate-user").addEventListener("click",()=>{
+    const u=users[activeUserId];
+    const prompts={
+      xiaolin:"那如果我这周确定，后面报名和开课怎么安排？",
+      zhouzhou:"我预算有限，你们到底有没有额外优惠？",
+      jiajia:"那要是老师不适合我，能随时退款吗？"
+    };
+    u.conversation.push({type:"user",text:prompts[activeUserId]});
+    if(activeUserId==="jiajia"){
+      activeScenario="质检转人工";
+      u.risk=true;
+    }
+    renderMessages();
+    renderReplyOptions();
+    renderSimulator();
+    showToast("已模拟用户提问，AI 正在生成 3 个候选");
+  });
+
+  document.querySelector("#custom-reply-input").addEventListener("input",e=>{
+    customMode=e.target.value.trim().length>0;
+    renderReplyOptions();
+  });
+
+  document.querySelector("#send-reply").addEventListener("click",()=>{
+    const u=users[activeUserId];
+    const input=document.querySelector("#custom-reply-input");
+    const text=customMode&&input.value.trim()?input.value.trim():u.replies[selectedReply].text;
+    u.conversation.push({type:"ai",text});
+    input.value="";
+    customMode=false;
+    renderMessages();
+    renderSimulator();
+    showToast(u.risk?"人工审核通过，已回复并写入场景记忆":"回复已发送，本次偏好已写入场景记忆");
+  });
+
+  document.querySelector("#refresh-profile").addEventListener("click",()=>{
+    renderProfileDetail();
+    showToast("画像已融合最新会话与产品行为");
+  });
+
+  const openSop=()=>openModal("#sop-modal");
+  document.querySelector("#adjust-sop").addEventListener("click",openSop);
+  document.querySelector("#adjust-sop-inline").addEventListener("click",openSop);
+  document.querySelector("#time-minus").addEventListener("click",()=>{timeValue=Math.max(.5,timeValue-.5);document.querySelector("#time-value").textContent=`${timeValue} 天`;});
+  document.querySelector("#time-plus").addEventListener("click",()=>{timeValue=Math.min(7,timeValue+.5);document.querySelector("#time-value").textContent=`${timeValue} 天`;});
+  document.querySelector("#sop-step-select").addEventListener("change",e=>{
+    currentSopIndex=Number(e.target.value);
+    const raw=sopSteps[currentSopIndex].time;
+    timeValue=raw==="立即"?0.5:Number(raw.replace(" 天",""))||1;
+    document.querySelector("#time-value").textContent=`${timeValue} 天`;
+  });
+  document.querySelector("#save-sop-change").addEventListener("click",()=>{
+    closeModals();
+    document.querySelector("#retention-step").textContent=sopSteps[currentSopIndex].name;
+    document.querySelector("#retention-time").textContent=`${timeValue} 天`;
+    openModal("#retention-modal");
+  });
+  document.querySelectorAll("[data-retention]").forEach(btn=>btn.addEventListener("click",()=>{
+    const keep=btn.dataset.retention==="keep";
+    if(keep){
+      sopSteps[currentSopIndex].time=`${timeValue} 天`;
+      renderSop();
+      document.querySelector("#change-history").innerHTML=`<span><i data-lucide="history"></i>${sopSteps[currentSopIndex].name} 已由 1 天调整为 ${timeValue} 天，并保存为公司 SOP 默认规则</span>`;
+    }
+    closeModals();
+    showToast(keep?"修改已保存，供下次 SOP 流程使用":"修改仅用于本次场景，不改变默认 SOP");
+    icons();
+  }));
+
+  document.querySelector("#upload-script").addEventListener("click",()=>{
+    openModal("#import-modal");
+    document.querySelector("#import-modal h3").textContent="上传公司话术库";
+    document.querySelector("#import-modal .upload-zone strong").textContent="拖入 Excel / Word / PDF 话术库";
+    document.querySelector("#import-modal .parse-preview strong").textContent="识别到 12 条标准口径、4 条禁止词与风险动作";
+    document.querySelector("#confirm-import").innerHTML='<i data-lucide="check"></i>确认启用';
+    icons();
+  });
+
+  document.querySelector("#reset-simulator").addEventListener("click",()=>{
+    activeUserId="xiaolin";
+    activeScenario="试听转化";
+    renderSimulator();
+    showToast("客户端模拟已重置");
+  });
+});
+

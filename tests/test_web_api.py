@@ -2,12 +2,9 @@ import json
 import tempfile
 import unittest
 import os
-<<<<<<< HEAD
-=======
 import http.client
 import threading
 from http.server import ThreadingHTTPServer
->>>>>>> 63625db7de08473c3560290102df65491798ed49
 from contextlib import closing
 from pathlib import Path
 from datetime import datetime
@@ -22,8 +19,6 @@ from web_api import worker
 original_connect = main.workflow.connect
 
 
-<<<<<<< HEAD
-=======
 class WebOriginTests(unittest.TestCase):
     def test_custom_origin_can_read_and_start_jobs(self):
         server = ThreadingHTTPServer(('127.0.0.1', 0), main.Handler)
@@ -57,7 +52,6 @@ class WebOriginTests(unittest.TestCase):
             server.server_close()
 
 
->>>>>>> 63625db7de08473c3560290102df65491798ed49
 class WebApprovalTests(unittest.TestCase):
     def test_real_worker_job_id_can_be_interrupted_before_writeback(self):
         with tempfile.TemporaryDirectory() as folder:
