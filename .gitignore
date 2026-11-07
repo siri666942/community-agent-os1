@@ -1,0 +1,38 @@
+node_modules/
+dist/
+coverage/
+cov-merged/
+docs/
+# release-notes/ intentionally NOT ignored (CX-15 two-state release body, OBS-F)
+docs/api/
+*.log
+.DS_Store
+.claw-mem-index/
+.claw-ctx/
+src/version.ts.npmrc
+
+# Local agent notes / session transcripts / backups (not part of the repo)
+memory/
+transcripts/
+*.bak
+.devclaw/*.bak
+devclaw.json.bak-*
+
+# Internal collaboration dirs (do not commit to public repo)
+inbox/
+.devclaw/
+
+# Runtime agent memory template (local state, never commit)
+MEMORY.md
+
+# Local OPC business state and SQLite sidecars
+junction/output/workflow.sqlite3
+junction/output/workflow.sqlite3-wal
+junction/output/workflow.sqlite3-shm
+junction/output/workflow.sqlite3-journal
+
+# Local runtime and review artifacts
+__pycache__/
+*.py[cod]
+__MACOSX/
+.playwright-mcp/
