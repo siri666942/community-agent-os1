@@ -2,11 +2,6 @@
 
 JUNCTION CHINA 2026「OPC · 一人公司」赛题作品。一个人类经营者借助两个业务 Agent，管理儿童阅读训练营的客服、数据、增长、内容和质检。现有知识库包含群聊素材、逐日 SOP、异议应答和质检规则；使用真实语料前需核查隐私和访问权限。
 
-<<<<<<< HEAD
-## 启动本地控制台
-
-在 `junction` 目录安装依赖，确保本机 Magpie 已配置 SophNet，然后启动：
-=======
 ## Windows 一键启动（推荐）
 
 在仓库根目录双击 `start-dev.cmd`，或在 PowerShell 中执行 `.\\start-dev.cmd`。启动器将安全地 `fetch` 并快进更新 `design/warm-editorial-opc`，安装 Python / npm 依赖，分别打开后端（8765）和 React 前端（5173）的 PowerShell 窗口，并在浏览器打开工作台。已有未提交的受跟踪文件修改时会拒绝更新，绝不会强制覆盖。
@@ -16,17 +11,10 @@ JUNCTION CHINA 2026「OPC · 一人公司」赛题作品。一个人类经营者
 ## 启动本地控制台
 
 在 `junction` 目录安装 Python 依赖，同时构建 React 前端：
->>>>>>> 63625db7de08473c3560290102df65491798ed49
 
 ```bash
 cd junction
 pip install -r requirements.txt
-<<<<<<< HEAD
-python -m web_api.main
-```
-
-打开 <http://127.0.0.1:8765/>。控制台提供工单、运营包、审批、经营分析和双 Agent 跟进演示。服务只监听本机，是单机演示工具，没有登录或远程访问控制；不要直接暴露到公网。模型调用失败、截断或输出为空时进入待复核，不会伪造成功。
-=======
 cd web
 npm install
 npm run build
@@ -35,7 +23,6 @@ python -m web_api.main
 ```
 
 打开 <http://127.0.0.1:8765/>。也可以启动 `junction/web` 下的 `npm run dev`，访问 <http://127.0.0.1:5173/> 并通过 Vite 代理连接 Python API。首次运行必须先构建前端，完整步骤见 [React 前端说明](web/README.md)。控制台提供工单、运营包、审批、经营分析和双 Agent 跟进演示。服务只监听本机，是单机演示工具，没有登录或远程访问控制；不要直接暴露到公网。模型调用失败、截断或输出为空时进入待复核，不会伪造成功。
->>>>>>> 63625db7de08473c3560290102df65491798ed49
 
 默认使用 `http://127.0.0.1:3425/v1/responses` 和 `sophnet/DeepSeek-V4.1-Flash-1017`。可通过 `OPC_MAGPIE_BASE_URL`、`OPC_MAGPIE_TOKEN`、`OPC_MAGPIE_ACTOR_TOKEN` 和 `OPC_MODEL` 覆盖配置；不要将真实密钥写入仓库。需要 MiMo 时设置 `OPC_LLM_PROVIDER=mimo`、`ANTHROPIC_BASE_URL` 和 `ANTHROPIC_AUTH_TOKEN`，可选设置 `OPC_MODEL`。
 
@@ -78,11 +65,7 @@ opc/workflow.py        共享状态与双 Agent 受控编排
 opc/agents/            客服、内容、质检与周报
 opc/knowledge_base.py  知识检索
 opc/gates.py           人工审批闸门
-<<<<<<< HEAD
-web/                   控制台页面
-=======
 web/                   React + Vite 控制台（src/、dist/）
->>>>>>> 63625db7de08473c3560290102df65491798ed49
 web_api/               本地网页服务与接口
 knowledge/             SOP、QA、质检规则和群聊素材
 hub/                   业务卷宗和周报

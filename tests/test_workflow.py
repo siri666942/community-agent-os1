@@ -21,8 +21,6 @@ class WorkflowTests(unittest.TestCase):
         plan = workflow.plan(self.db)
         self.assertTrue(any(t['action'] == '暂停触达' for t in plan['tasks']))
         self.assertTrue(any(t['action'] == '温和提醒' for t in plan['tasks']))
-<<<<<<< HEAD
-=======
     def test_consent_changes_require_evidence_and_revoke_eligibility(self):
         customer = 'demo-001'
         with self.assertRaises(ValueError):
@@ -34,7 +32,6 @@ class WorkflowTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             workflow.change_consent(self.db, customer, 'true', '无效类型')
 
->>>>>>> 63625db7de08473c3560290102df65491798ed49
     @patch('opc.workflow.compliance.review_loop')
     @patch('opc.workflow.chat', return_value='温和提醒')
     def test_two_roles_keep_review_as_separate_gate(self, chat, review):
