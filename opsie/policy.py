@@ -14,3 +14,9 @@ def load():
 def confirmed_facts(policy):
     return {key: item["value"] for key, item in policy["policies"].items()
             if item.get("status") == "confirmed" and item.get("value") is not None}
+
+
+def quality_guidance(document):
+    """Current QC guidance, with provisional rules explicitly marked as such."""
+    return {key: {'status': item.get('status'), 'guidance': item.get('value') if item.get('status') == 'confirmed' else item.get('fallback')}
+            for key, item in document['policies'].items() if key.startswith('qc.')}

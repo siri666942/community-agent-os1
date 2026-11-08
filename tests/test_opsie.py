@@ -2,7 +2,7 @@
 import unittest
 import copy
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from opsie import ai, auth, dashboard, profile
 from opsie.db import now
@@ -89,6 +89,56 @@ class QualityTests(unittest.TestCase):
     def test_unprocessed_messages_not_misreported_as_low_intent(self):
         items = [{"id": "m:1", "sender_id": "1", "sender_role": "parent", "text": "请问价格", "time": now(), "type": "text"}]
         self.assertEqual(dashboard.intent(items, "1", {})["level"], "待识别")
+
+
+class AutoDraftTests(unittest.TestCase):
+    @staticmethod
+    def msg(key, role, kind='text'):
+        return {'id': key, 'sender_role': role, 'sender_id': '1', 'type': kind}
+
+    def test_only_latest_unanswered_parent_message_triggers(self):
+        first = self.msg('one', 'parent')
+        teacher = self.msg('reply', 'teacher')
+        second = self.msg('two', 'parent')
+        self.assertTrue(ai.latest_unanswered([first], 'one'))
+        self.assertFalse(ai.latest_unanswered([first, teacher], 'one'))
+        self.assertFalse(ai.latest_unanswered([first, teacher, second], 'one'))
+        self.assertTrue(ai.latest_unanswered([first, teacher, second], 'two'))
+        self.assertFalse(ai.latest_unanswered([first, second], 'one'))
+
+    def test_sop_reference_excludes_old_scripts_and_facts(self):
+        result = ai.sop_reference('孩子测字不会', 'direct')
+        self.assertTrue(result)
+        self.assertTrue(all(set(entry) == {'day', 'scene', 'target', 'time'} for entry in result))
+
+    def test_instructions_must_be_bounded(self):
+        with self.assertRaises(ValueError):
+            ai.enqueue_drafts({'account_id': '1'}, '1', 'm:1', instruction='x' * 2001)
+
+    def test_worker_passes_teacher_request_and_complete_context_to_model(self):
+        conn = MagicMock()
+        conn.cursor.return_value.__enter__.return_value.fetchone.return_value = {
+            'conversation_id': '1', 'target_message_key': 'm:1'}
+        target = {'id': 'm:1', 'sender_id': '2', 'text': '阅读问题'}
+        history = [target, {'id': 'm:2', 'text': '后续消息'}]
+        with patch('opsie.ai.transaction') as transaction, \
+             patch('opsie.ai._update_job') as update, \
+             patch('opsie.ai.target_and_context', return_value=(target, history)), \
+             patch('opsie.ai.repository.ensure_member', return_value={'conversation_type': 'direct'}), \
+             patch('opsie.ai.dashboard.profile_for', return_value={'name': '家长'}), \
+             patch('opsie.ai.sop_reference', return_value=[{'scene': '私聊'}]), \
+             patch('opsie.ai.teammate_assistant.normalize_model_drafts', return_value=[]), \
+             patch('opsie.ai.review_candidates', return_value=[]), \
+             patch('opsie.ai.call_model', return_value={}) as model:
+            transaction.return_value.__enter__.return_value = conn
+            ai._draft_worker('job', {'account_id': '1'}, '语气温和', '需要润色的原文')
+        data = model.call_args.args[1]
+        self.assertEqual(data['teacher_instruction'], '语气温和')
+        self.assertEqual(data['text_to_polish'], '需要润色的原文')
+        self.assertEqual(data['complete_history'], history)
+        self.assertEqual(data['sop_reference'], [{'scene': '私聊'}])
+        self.assertIn('quality_guidance', data)
+        self.assertEqual(update.call_args.args[1], 'succeeded')
 
 
 if __name__ == "__main__":

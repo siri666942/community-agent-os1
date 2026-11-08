@@ -159,11 +159,13 @@ class Handler(BaseHTTPRequestHandler):
                 with transaction() as conn:
                     token, user = auth.login(conn, str(data.get("username", "")), str(data.get("password", "")))
                 return self.send_json(200, {"token": token, "user": user})
-            if path == "/api/v1/drafts":
+            if path in ("/api/v1/drafts", "/api/v1/drafts/auto"):
                 with transaction() as conn:
                     user = self.account(conn)
                 if user["role"] != "teacher": raise PermissionError("仅老师可生成回复")
-                job_id = ai.enqueue_drafts(user, str(data.get("conversation_id", "")), str(data.get("target_message_id", "")))
+                job_id = ai.enqueue_drafts(user, str(data.get("conversation_id", "")), str(data.get("target_message_id", "")),
+                                           instruction=data.get('instruction', ''), rewrite_text=data.get('rewrite_text', ''),
+                                           automatic=path.endswith('/auto'))
                 return self.send_json(202, {"job_id": job_id})
             if path == "/api/v1/summary":
                 with transaction() as conn:
@@ -250,6 +252,7 @@ class Handler(BaseHTTPRequestHandler):
                                  json.dumps(result, ensure_ascii=False), bool(data.get("confirmation")), str(data.get("variant", "CUSTOM"))[:32],
                                  bool(data.get("edited")), mid, policy.load()["runtime_version"], now()))
         if user["role"] == "parent" and created:
+            ai.EXECUTOR.submit(ai.prepare_auto_drafts, cid, "m:" + mid)
             try:
                 ai.assess_inbound(user, cid, {"id": "m:" + mid, "sender_id": user["user_id"], "text": text, "time": now()})
             except Exception:

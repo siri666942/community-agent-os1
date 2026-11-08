@@ -42,7 +42,7 @@
             <header class="chat-head"><div><strong id="chat-title">选择一个会话</strong><small id="chat-subtitle">查看消息并开始交流</small></div><button id="load-history" class="subtle">查看全部历史</button></header>
             <div id="messages" class="message-stage"><div class="empty">选择左侧会话开始交流</div></div>
             <div id="inbound-alert" class="inbound-alert hidden"></div>
-            <section id="assistant-panel" class="assistant-panel teacher-only"><div class="assistant-heading"><div><span class="eyebrow">AI ASSISTANT</span><h3>AI 建议回复</h3><p id="draft-hint">选择一条家长消息，结合上下文生成建议。</p></div><button id="generate" class="outline">生成建议</button></div><div id="drafts" class="draft-list"></div></section>
+            <section id="assistant-panel" class="assistant-panel teacher-only"><div class="assistant-heading"><div><span class="eyebrow">AI ASSISTANT</span><h3>AI 建议回复</h3><p id="draft-hint">选择一条家长消息，结合上下文生成建议。</p></div><button id="generate" class="outline">生成建议</button></div><label class="draft-instruction-label" for="draft-instruction">补充要求（选填）</label><div class="draft-controls"><input id="draft-instruction" maxlength="2000" placeholder="例如：语气温和一些，先安抚家长"><button type="button" id="polish" class="subtle">润色输入框的文字</button></div><div id="drafts" class="draft-list"></div></section>
             <form id="send-form" class="composer"><textarea id="message-input" rows="2" maxlength="6000" placeholder="输入消息…"></textarea><div class="composer-footer"><span id="send-status">按 Enter 发送，Shift + Enter 换行</span><button id="send-button" type="submit" class="primary">发送消息 ↗</button></div></form>
           </section>
           <aside id="chat-profile" class="profile-side panel teacher-only"><div class="empty">选择家长消息后查看画像</div></aside>

@@ -5,6 +5,7 @@ const state = {token:sessionStorage.getItem('opsie.token'), user:null, conversat
   job:null, jobTimer:null, drafts:[], selected:null, profile:null, dashboard:null, page:'chat', full:false, renderKey:'', loading:null, pending:[]};
 let toastTimer;
 let dashboardRequest=null;
+let draftRequest=0;
 function dashboardCacheKey(){return 'opsie.dashboard.'+state.user.user_id}
 function toast(message){const el=$('#toast');el.textContent=message;el.classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.add('hidden'),4000);}
 async function api(path, options={}){
@@ -62,7 +63,7 @@ function renderConversations(){
 $('#search').oninput=renderConversations;
 async function openConversation(cid,navigate=true){
   if(state.cid===cid){if(navigate)showPage('chat');return}
-  state.cid=cid;state.target=null;state.profile=null;state.drafts=[];state.job=null;state.full=false;state.selected=null;state.renderKey='';
+  state.cid=cid;state.target=null;state.profile=null;state.drafts=[];state.job=null;state.full=false;state.selected=null;state.renderKey='';draftRequest++;
   state.messages=[];$('#messages').innerHTML='<div class="empty">正在加载会话…</div>';$('#generate').disabled=false;
   clearTimeout(state.jobTimer);$('#message-input').value='';$('#draft-hint').textContent='选择一条家长消息，结合上下文生成建议。';$('#drafts').innerHTML='';$('#inbound-alert').classList.add('hidden');
   const c=state.conversations.find(x=>x.id===cid);$('#chat-title').textContent=c?.title||'会话';$('#chat-subtitle').textContent=c?.type==='group'?'群聊 · 点击家长消息选择回复对象':'一对一聊天';
@@ -99,11 +100,18 @@ $('#load-history').onclick=()=>{state.full=true;refreshMessages(true)};
 async function selectTarget(key, generate=false){
   const cid=state.cid;const msg=state.messages.find(m=>m.id===key);if(!msg)return;
   const changed=state.target!==key;state.target=key;renderMessages(false);
-  if(changed){state.drafts=[];state.selected=null;state.job=null;clearTimeout(state.jobTimer);$('#drafts').innerHTML='';$('#draft-hint').textContent='回复 '+msg.sender_name+' · '+msg.text.slice(0,30);}
+  if(changed){draftRequest++;state.drafts=[];state.selected=null;state.job=null;clearTimeout(state.jobTimer);$('#generate').disabled=false;$('#drafts').innerHTML='';$('#draft-hint').textContent='回复 '+msg.sender_name+' · '+msg.text.slice(0,30)+' · 可手动生成建议';}
   if(state.user.role==='teacher'){
-    if(generate&&changed&&state.cid===cid&&state.target===key) generateDrafts();
+    if(generate&&changed&&latestUnanswered(key)) loadAutoDrafts(cid,key);
     try{const p=await api('/api/v1/profile/'+encodeURIComponent(msg.sender_id));if(state.cid===cid&&state.target===key){state.profile=p;renderSideProfile()}}catch(e){toast(e.message)}
   }
+}
+function latestUnanswered(key){for(const m of [...state.messages].reverse()){if(m.sender_role==='teacher')return false;if(m.sender_role==='parent'&&m.sender_id&&m.type==='text')return m.id===key}return false}
+async function loadAutoDrafts(cid,target){
+  const request=++draftRequest;$('#draft-hint').textContent='正在获取未回复消息的 AI 建议…';
+  try{const r=await post('/api/v1/drafts/auto',{conversation_id:cid,target_message_id:target});if(request!==draftRequest||cid!==state.cid||target!==state.target)return;
+    if(!r.job_id){$('#draft-hint').textContent='该消息已回复，可手动生成建议';return}state.job=r.job_id;$('#generate').disabled=true;pollJob(r.job_id,cid,target)
+  }catch(e){if(request===draftRequest&&cid===state.cid&&target===state.target)$('#draft-hint').textContent='获取自动建议失败：'+e.message+'。可手动生成。'}
 }
 async function loadInbound(cid){
   try{const data=await api('/api/v1/inbound/'+cid);if(cid!==state.cid)return;
@@ -115,11 +123,12 @@ async function loadInbound(cid){
   }catch{}
 }
 $('#generate').onclick=()=>generateDrafts();
-async function generateDrafts(){
+$('#polish').onclick=()=>{if(!$('#message-input').value.trim()){toast('请先在消息输入框中写下需要润色的文字');return}generateDrafts(true)};
+async function generateDrafts(polish=false){
   if(!state.target){toast('请先选择一条家长消息');return}
-  const cid=state.cid,target=state.target;clearTimeout(state.jobTimer);state.job=null;state.drafts=[];renderDrafts();$('#draft-hint').textContent='正在阅读会话并生成三条建议…';$('#generate').disabled=true;
-  try{const r=await post('/api/v1/drafts',{conversation_id:cid,target_message_id:target});if(cid!==state.cid||target!==state.target)return;state.job=r.job_id;pollJob(r.job_id,cid,target)}
-  catch(e){if(cid===state.cid&&target===state.target){$('#draft-hint').textContent='生成失败：'+e.message;$('#generate').disabled=false}}
+  const cid=state.cid,target=state.target,request=++draftRequest;clearTimeout(state.jobTimer);state.job=null;state.drafts=[];renderDrafts();$('#draft-hint').textContent='正在阅读会话并生成三条建议…';$('#generate').disabled=true;
+  try{const r=await post('/api/v1/drafts',{conversation_id:cid,target_message_id:target,instruction:$('#draft-instruction').value.trim(),rewrite_text:polish?$('#message-input').value.trim():''});if(request!==draftRequest||cid!==state.cid||target!==state.target)return;state.job=r.job_id;pollJob(r.job_id,cid,target)}
+  catch(e){if(request===draftRequest&&cid===state.cid&&target===state.target){$('#draft-hint').textContent='生成失败：'+e.message;$('#generate').disabled=false}}
 }
 async function pollJob(job,cid,target,failures=0){
   if(job!==state.job||cid!==state.cid||target!==state.target)return;
