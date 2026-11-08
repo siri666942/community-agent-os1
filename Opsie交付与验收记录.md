@@ -1,4 +1,4 @@
-# 女娲补天交付与验收记录
+# Opsie交付与验收记录
 
 日期：2026-11-08，Asia/Shanghai  
 工作分支：`codex/nuwa-mvp`
