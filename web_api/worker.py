@@ -1,6 +1,7 @@
 """One isolated web job. The JSON request consumes stdin before CLI gates run."""
 import contextlib
 import json
+import os
 import sys
 import uuid
 
@@ -28,6 +29,26 @@ def execute(kind, data):
         if not day: raise ValueError('请选择营期日')
         with workflow.connect() as db: return workflow.sop_run(db, day)
     if kind == 'report': return {'report': report.weekly_report()}
+    if kind == 'agent-proxy':
+        # 联调通道:转发到 junction Agent Service(三层架构中间层)。
+        # 仅放行 /api/v1/* 与 /healthz,响应包装为 {http_status, data}。
+        import urllib.error
+        import urllib.request
+        base = os.environ.get('OPC_AGENT_SERVICE_URL', 'http://127.0.0.1:8080').rstrip('/')
+        path = data.get('path', '')
+        if not isinstance(path, str) or not (path.startswith('/api/v1/') or path == '/healthz'):
+            raise ValueError('仅代理 Agent Service 的 /api/v1/* 与 /healthz 接口')
+        method = str(data.get('method', 'GET')).upper()
+        payload = data.get('body')
+        req = urllib.request.Request(
+            base + path,
+            data=json.dumps(payload).encode('utf-8') if payload is not None else None,
+            headers={'Content-Type': 'application/json'}, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=180) as resp:
+                return {'http_status': resp.status, 'data': json.loads(resp.read() or b'{}')}
+        except urllib.error.HTTPError as exc:
+            return {'http_status': exc.code, 'data': json.loads(exc.read() or b'{}')}
     with workflow.connect() as db:
         if kind == 'workflow-seed':
             workflow.seed_demo(db)
