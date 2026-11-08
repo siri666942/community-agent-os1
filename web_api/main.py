@@ -447,7 +447,8 @@ class Handler(BaseHTTPRequestHandler):
                     else:
                         workflow.change_consent(db, payload.get('customer_id'), payload.get('consent'), payload.get('source', ''))
                 return self._send(200, {'status': 'UPDATED'})
-            endpoints = {'/api/service': 'service', '/api/sop': 'sop', '/api/report': 'report'}
+            endpoints = {'/api/service': 'service', '/api/sop': 'sop', '/api/report': 'report',
+                         '/api/agent': 'agent-proxy'}
             endpoints.update({f'/api/workflow/{key}': 'workflow-' + key for key in ('seed', 'plan', 'plan-content', 'content', 'approve', 'queue', 'receipt')})
             if path not in endpoints: return self._send(404, {'error': '未找到接口'})
             return self._send(202, start_job(endpoints[path], payload))
