@@ -31,11 +31,17 @@ def detect_intents(messages: list[str]) -> dict:
     return hits
 
 
-def activity_score(daily: list[list]) -> dict:
-    """活跃度:daily = 近 7 日 [[是否阅读 0/1, 时长分钟], ...]。"""
+def activity_score(daily: list[list], avg_fallback: float = 0.0) -> dict:
+    """活跃度:daily = 近 7 日 [[是否阅读 0/1, 时长分钟], ...]。
+
+    口径说明:Excel 导出的逐日「阅读时长」列全为 0(仅「是否阅读」有效),
+    日均时长改用「平均阅读时长」列兜底(avg_fallback),阈值判定不受影响。
+    """
     active_days = sum(1 for d in daily if d and d[0])
     total_minutes = sum((d[1] or 0) for d in daily if d)
     avg_minutes = total_minutes / 7 if daily else 0.0
+    if avg_minutes <= 0 < active_days and avg_fallback > 0:
+        avg_minutes = avg_fallback  # 逐日时长缺失,以平均阅读时长列为准
     day_ok = active_days >= config.ACTIVITY_DAYS_THRESHOLD
     min_ok = avg_minutes >= config.ACTIVITY_MINUTES_THRESHOLD
     if day_ok and min_ok:
@@ -68,6 +74,19 @@ def intent_level(intent_hits: dict) -> dict:
     }
 
 
+def behavior_intents(customer: dict) -> dict:
+    """无对话数据时,用行为数据作意向代理信号(置信度低,如实标注)。"""
+    hits: dict[str, list[str]] = {}
+    if (customer.get("link_clicks") or 0) > 0:
+        hits["价格关注(链接点击)"] = ["会员链接点击"]
+    tags = customer.get("tag_list") or []
+    if any("意向" in t or "挖需" in t for t in tags):
+        hits["已标记意向(标签)"] = tags
+    if customer.get("tested") == "已测字":
+        hits["测评参与(测字)"] = ["已测字"]
+    return hits
+
+
 def segment(activity: str, intent: str, has_interaction: bool = True) -> dict:
     """分层建议:S1 高价值推进 / S2 培育观察 / S3 低压力激活。"""
     if activity == "高" and intent == "高":
@@ -85,9 +104,14 @@ def build_profile(customer: dict, recent_messages: list[str] | None = None) -> d
     daily_all = customer.get("daily", [])
     # 「近 7 日」取逐日列的最后 7 天(第十五天~第二十一天)
     recent7 = daily_all[-7:] if len(daily_all) >= 7 else daily_all
-    act = activity_score(recent7)
+    act = activity_score(recent7, avg_fallback=float(customer.get("avg_read_minutes") or 0))
     hits = detect_intents(recent_messages or [])
+    behavior = not hits
+    if behavior:
+        hits = behavior_intents(customer)  # 无对话数据 → 行为代理信号
     itn = intent_level(hits)
+    if behavior:
+        itn["confidence"] = "low"  # 行为代理,置信度下降(无对话意图数据)
     has_interaction = bool(recent_messages) or act["active_days"] > 0
     seg = segment(act["level"], itn["level"], has_interaction)
 

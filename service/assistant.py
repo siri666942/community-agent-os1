@@ -33,11 +33,24 @@ FACTS_BY_SIGNAL = {
 DEFAULT_TOPIC = "阅读会员"
 DEFAULT_FACTS = "App 会先测识字量再动态推荐绘本，每天 15-20 分钟，伴学老师全程跟进"
 
+# 信号名 → 自然话题名(避免「您问的问价」这类生硬拼接)
+TOPIC_NAMES = {
+    "问价": "价格", "问班型": "班型安排", "约试听": "试听",
+    "要资料": "学习资料", "问师资": "老师资质",
+}
+
 
 def _topic_and_facts(message: str) -> tuple[str, str]:
+    # 敏感话题优先贴题回应(退费规范 / 效果口径),不绕开家长的问题
+    if any(k in message for k in ("退", "退款", "退费")):
+        return "退费", ("退费以您签署的课程服务协议为准，我先把正式退费规则发给您确认，"
+                        "不同订单情况会不一样，我按您的订单逐项核对")
+    if any(k in message for k in ("保证", "效果", "提高", "提分", "识字量")):
+        return "效果", ("内容按孩子识字水平动态推荐、逐步积累，效果因人而异、需要时间，"
+                        "我们不做幅度与见效时间的承诺")
     for signal, kws in profile_mod.INTENT_SIGNALS.items():
         if any(k in message for k in kws):
-            return signal, FACTS_BY_SIGNAL[signal]
+            return TOPIC_NAMES[signal], FACTS_BY_SIGNAL[signal]
     return DEFAULT_TOPIC, DEFAULT_FACTS
 
 

@@ -49,6 +49,16 @@ class TestQC(unittest.TestCase):
     def test_effect_number_yellow(self):
         self.assertEqual(qc.check("21天认识500个字")["status"], "yellow")
 
+    def test_self_correction_yellow(self):
+        r = qc.check("更容易保持下来(哦不对,是更容易保持每天的阅读频率😄)")
+        self.assertEqual(r["status"], "yellow")
+        self.assertIn("自我修正语", [x["type"] for x in r["risks"]])
+
+    def test_effect_number_demo_case(self):
+        r = qc.check("保持两年,识字量可以达到2500—3000")
+        self.assertEqual(r["status"], "yellow")
+        self.assertIn("量效数字承诺", [x["type"] for x in r["risks"]])
+
 
 class TestProfile(unittest.TestCase):
     def _cust(self, daily):

@@ -43,6 +43,9 @@ RULES: list[tuple[re.Pattern, str, str, str]] = [
 # 量效数字承诺:出现「N天认识N字」类效果数字 → 提示(可争论阈值,先拦提示)
 EFFECT_NUMBER = re.compile(r"\d+\s*天.{0,8}(认识|学会|掌握)\s*\d+|识字量.{0,4}\d{3,4}|达到\s*\d{3,4}\s*(个字|字)")
 
+# 自我修正语:改口痕迹泄漏到最终稿 → 提示
+SELF_CORRECTION = re.compile(r"哦不对|应该是|更正一下|抱歉.{0,4}(重|改)|\(哦|（哦")
+
 
 def check(text: str) -> dict:
     """文本质检 → {"status": "green|yellow|red", "risks": [...], "suggestion": str|None}。"""
@@ -57,6 +60,11 @@ def check(text: str) -> dict:
         risks.append({"type": "量效数字承诺", "level": "yellow",
                       "matched": m.group(0),
                       "suggestion": "效果数字改为区间或定性表述，注明个体差异。"})
+    m = SELF_CORRECTION.search(text)
+    if m:
+        risks.append({"type": "自我修正语", "level": "yellow",
+                      "matched": m.group(0),
+                      "suggestion": "删除改口痕迹，直接给出最终表述。"})
 
     if any(r["level"] == "red" for r in risks):
         status = "red"

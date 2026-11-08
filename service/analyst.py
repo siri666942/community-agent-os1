@@ -22,7 +22,8 @@ def daily_list(limit: int = 50, uid_filter: str | None = None) -> dict:
         total = len(customers)
     else:
         total = repo.count_customers()
-        customers = repo.list_customers(limit=limit)
+        # 扫描面大于返回面:S1 高价值用户稀少(约千分之二),批处理扫 5000 行采样
+        customers = repo.list_customers(limit=max(limit * 50, 5000))
 
     buckets: dict[str, list] = {"S1": [], "S2": [], "S3": []}
     for c in customers:

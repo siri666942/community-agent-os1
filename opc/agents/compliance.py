@@ -50,6 +50,20 @@ def scan(text: str) -> list:
                 "type": "过度承诺", "original": w,
                 "suggestion": "移除承诺,按 21天/15天/7天 使用权限口径说明",
             })
+    # 量化效果承诺:识字量/字数/天数类效果数字
+    m = re.search(r"\d+\s*天.{0,8}(认识|学会|掌握)\s*\d+|识字量.{0,4}\d{3,4}|达到\s*\d{3,4}\s*(个字|字)", text)
+    if m:
+        violations.append({
+            "type": "量化效果承诺", "original": m.group(0),
+            "suggestion": "效果改为定性描述(如「逐步积累」),不出现具体数字承诺",
+        })
+    # 自我修正语:改口痕迹,一次成型
+    m = re.search(r"哦不对|应该是|更正一下|抱歉.{0,4}(重|改)|\(哦|（哦", text)
+    if m:
+        violations.append({
+            "type": "自我修正语", "original": m.group(0),
+            "suggestion": "删除改口痕迹,直接给出最终表述",
+        })
     return violations
 
 
