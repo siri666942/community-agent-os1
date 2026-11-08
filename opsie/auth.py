@@ -4,6 +4,7 @@ import hmac
 import secrets
 from datetime import timedelta
 from .db import now
+from .demo_data import display_name
 
 ITERATIONS = 310000
 
@@ -43,7 +44,7 @@ def login(conn, username, password):
 
 def public_account(account):
     return {"account_id": str(account["account_id"]), "user_id": str(account["user_id"]),
-            "role": account["role"], "display_name": account["display_name"]}
+            "role": account["role"], "display_name": display_name(account['user_id'], account['display_name'])}
 
 
 def identify(conn, token):

@@ -4,7 +4,7 @@ import copy
 from datetime import timedelta
 from unittest.mock import patch, MagicMock
 
-from opsie import ai, auth, dashboard, profile, library
+from opsie import ai, auth, dashboard, profile, library, demo_data
 from opsie.db import now
 
 
@@ -162,6 +162,18 @@ class LibraryTests(unittest.TestCase):
              patch('opsie.ai.policy.load', return_value={'runtime_version': 'current'}):
             result = ai.job_status(conn, {'account_id': '1'}, 'j')
         self.assertTrue(result['stale'])
+
+
+class DemoDataTests(unittest.TestCase):
+    def test_group_background_is_fictional_and_contains_only_text(self):
+        messages = demo_data.group_messages(now())
+        self.assertGreater(len(messages), 5)
+        self.assertTrue(all(m['id'].startswith('s:') and m['type'] == 'text' for m in messages))
+        self.assertTrue(all(m['sender_name'] in demo_data.NAMES.values() for m in messages))
+
+    def test_public_account_uses_demo_display_name(self):
+        account = {'account_id': 1, 'user_id': 201, 'role': 'parent', 'display_name': '真实姓名'}
+        self.assertEqual(auth.public_account(account)['display_name'], demo_data.NAMES['201'])
 
 
 if __name__ == "__main__":

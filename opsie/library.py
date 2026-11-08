@@ -10,8 +10,11 @@ def list_entries(conn):
         return cur.fetchall()
 
 
-def snapshot():
-    with transaction() as conn:
+def snapshot(conn=None):
+    if conn is None:
+        with transaction() as owned:
+            entries = list_entries(owned)
+    else:
         entries = list_entries(conn)
     items = [{k: e[k] for k in ('entry_id', 'kind', 'title', 'content', 'level')} for e in entries]
     version = hashlib.sha256(json.dumps(items, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:16]

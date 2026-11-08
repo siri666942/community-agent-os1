@@ -46,3 +46,5 @@ _backup/
 /.opsie-venv/
 /.codex/config.toml
 /配置文件文字版.txt
+# Imported real conversations stay local and are not part of the demo dataset.
+/knowledge/chats.json

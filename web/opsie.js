@@ -2,12 +2,12 @@
 const $ = s => document.querySelector(s);
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const state = {token:sessionStorage.getItem('opsie.token'), user:null, conversations:[], cid:null, messages:[], target:null,
-  job:null, jobTimer:null, drafts:[], selected:null, profile:null, dashboard:null, page:'chat', full:false, renderKey:'', loading:null, pending:[]};
+  job:null, jobTimer:null, drafts:[], selected:null, profile:null, dashboard:null, page:'chat', full:false, renderKey:'', loading:null, pending:[], views:{}};
 let toastTimer;
 let dashboardRequest=null;
 let draftRequest=0;
 let libraryItems=[];
-function dashboardCacheKey(){return 'opsie.dashboard.'+state.user.user_id}
+function dashboardCacheKey(){return 'opsie.dashboard.v2.'+state.user.user_id}
 function toast(message){const el=$('#toast');el.textContent=message;el.classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.add('hidden'),4000);}
 async function api(path, options={}){
   const headers={'Content-Type':'application/json'}; if(state.token) headers.Authorization='Bearer '+state.token;
@@ -73,14 +73,16 @@ function renderConversations(){
 $('#search').oninput=renderConversations;
 async function openConversation(cid,navigate=true){
   if(state.cid===cid){if(navigate)showPage('chat');return}
-  state.cid=cid;state.target=null;state.profile=null;state.drafts=[];state.job=null;state.full=false;state.selected=null;state.renderKey='';draftRequest++;
-  state.messages=[];$('#messages').innerHTML='<div class="empty">正在加载会话…</div>';$('#generate').disabled=false;
-  clearTimeout(state.jobTimer);$('#message-input').value='';$('#draft-hint').textContent='选择一条家长消息，结合上下文生成建议。';$('#drafts').innerHTML='';$('#inbound-alert').classList.add('hidden');
+  if(state.cid)state.views[state.cid]={messages:state.messages,renderKey:state.renderKey,full:state.full,target:state.target,profile:state.profile,drafts:state.drafts,selected:state.selected,job:state.job,input:$('#message-input').value,instruction:$('#draft-instruction').value,hint:$('#draft-hint').textContent};
+  const cached=state.views[cid];state.cid=cid;state.target=cached?.target||null;state.profile=cached?.profile||null;state.drafts=cached?.drafts||[];state.job=cached?.job||null;state.full=cached?.full||false;state.selected=cached?.selected??null;state.renderKey=cached?.renderKey||'';draftRequest++;
+  state.messages=cached?.messages||[];$('#generate').disabled=false;
+  clearTimeout(state.jobTimer);$('#message-input').value=cached?.input||'';$('#draft-instruction').value=cached?.instruction||'';$('#draft-hint').textContent=cached?.hint||'选择一条家长消息，结合上下文生成建议。';$('#inbound-alert').classList.add('hidden');
+  if(cached){renderMessages(true);renderDrafts();if(state.user.role==='teacher'){renderSideProfile();if(state.job&&!state.drafts.length){$('#generate').disabled=true;pollJob(state.job,cid,state.target)}}}else{$('#messages').innerHTML='<div class="empty">正在加载会话…</div>';$('#drafts').innerHTML='';if(state.user.role==='teacher')renderSideProfile()}
   const c=state.conversations.find(x=>x.id===cid);$('#chat-title').textContent=c?.title||'会话';$('#chat-subtitle').textContent=c?.type==='group'?'群聊 · 点击家长消息选择回复对象':'一对一聊天';
-  renderConversations();if(navigate)showPage('chat');await refreshMessages(true);if(state.cid!==cid)return;
+  renderConversations();if(navigate)showPage('chat');await refreshMessages(!cached);if(state.cid!==cid)return;
   if(state.user.role==='teacher'){
     const target=[...state.messages].reverse().find(m=>m.sender_role==='parent'&&m.sender_id&&m.type==='text');
-    if(target) await selectTarget(target.id,true);
+    if(target&&!state.target) await selectTarget(target.id,true);
   }
 }
 async function refreshMessages(force=false){
@@ -99,7 +101,7 @@ function renderMessages(scroll){
   const stage=$('#messages');const nearBottom=stage.scrollHeight-stage.scrollTop-stage.clientHeight<100;
   stage.innerHTML=[...state.messages,...state.pending.filter(m=>m.cid===state.cid)].map(m=>{
     const mine=m.sender_id===state.user.user_id;const selectable=state.user.role==='teacher'&&m.sender_role==='parent'&&m.sender_id&&m.type==='text';
-    return `<div class="message ${mine?'mine':''} ${selectable?'selectable':''} ${state.target===m.id?'selected':''}" ${selectable?`data-target="${esc(m.id)}"`:''}><span class="avatar">${esc((m.sender_name||'?').slice(0,1))}</span><div class="message-body"><div class="message-meta">${esc(m.sender_name)} · ${m.pendingStatus?esc(m.pendingStatus):esc(String(m.time).slice(5,16))} ${m.source==='历史群'?' · 历史':m.source==='演示初始私聊'?' · 演示':''}</div><div class="bubble">${esc(m.text)}</div>${m.failed?`<div><button type="button" class="retry-send" data-retry="${esc(m.id)}">重试</button> <button type="button" class="retry-send" data-edit="${esc(m.id)}">编辑</button></div>`:''}</div></div>`;
+    return `<div class="message ${mine?'mine':''} ${selectable?'selectable':''} ${state.target===m.id?'selected':''}" ${selectable?`data-target="${esc(m.id)}"`:''}><span class="avatar">${esc((m.sender_name||'?').slice(0,1))}</span><div class="message-body"><div class="message-meta">${esc(m.sender_name)} · ${m.pendingStatus?esc(m.pendingStatus):esc(String(m.time).slice(5,16))} ${m.source==='演示群聊'||m.source==='演示初始私聊'?' · 演示':''}</div><div class="bubble">${esc(m.text)}</div>${m.failed?`<div><button type="button" class="retry-send" data-retry="${esc(m.id)}">重试</button> <button type="button" class="retry-send" data-edit="${esc(m.id)}">编辑</button></div>`:''}</div></div>`;
   }).join('')||'<div class="empty">还没有消息，打个招呼吧。</div>';
   stage.querySelectorAll('[data-target]').forEach(el=>el.onclick=()=>selectTarget(el.dataset.target,true));
   stage.querySelectorAll('[data-retry]').forEach(el=>el.onclick=()=>{const m=state.pending.find(x=>x.id===el.dataset.retry);if(m)sendPending(m)});

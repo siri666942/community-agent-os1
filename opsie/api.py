@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import ai, auth, dashboard, policy, repository, library
-from .db import ROOT, json_default, now, transaction
+from .db import ROOT, json_default, now, transaction, backend
 
 WEB = ROOT / "web"
 SECRET = secrets.token_bytes(32)
@@ -99,7 +99,7 @@ class Handler(BaseHTTPRequestHandler):
                     with transaction() as conn, conn.cursor() as cur:
                         cur.execute("SELECT 1")
                         cur.fetchone()
-                    return self.send_json(200, {"ok": True, "service": "opsie", "database": "connected"})
+                    return self.send_json(200, {"ok": True, "service": "opsie", "database": "connected", "backend": backend()})
                 except Exception:
                     return self.send_json(503, {"ok": False, "database": "unavailable"})
             with transaction() as conn:

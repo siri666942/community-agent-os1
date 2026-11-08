@@ -14,7 +14,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from opsie.db import transaction  # noqa: E402
+from opsie.db import transaction, backend  # noqa: E402
 
 BASE = "http://127.0.0.1:8780"
 credentials = json.loads((ROOT / ".dbmcp" / "demo-accounts.json").read_text(encoding="utf-8"))
@@ -39,6 +39,11 @@ def expect(status, expected, detail):
 
 
 def main():
+    if backend() != 'mysql':
+        raise RuntimeError('本脚本仅用于 MySQL 联调，请先设置 OPSIE_DB_BACKEND=mysql。SQLite 请运行 tests/test_sqlite_integration.py。')
+    status, health = request('/health')
+    if status != 200 or health.get('backend') != 'mysql':
+        raise RuntimeError('服务端不是 MySQL 模式，已停止测试以避免清理错误数据库。')
     marker = "opsie-e2e-" + uuid.uuid4().hex
     parent_client, second_client, third_client, teacher_client = marker + "-parent", marker + "-second", marker + "-stale", marker + "-teacher"
     message_ids, job_id, tokens = [], None, {}

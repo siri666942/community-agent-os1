@@ -1,7 +1,7 @@
 """Explainable indicators over the same messages used by chat."""
 from datetime import timedelta
 import json
-from . import repository, policy
+from . import repository, policy, demo_data
 from .db import now
 
 
@@ -62,15 +62,12 @@ def data(conn, account):
             cur.execute(f"""SELECT CONCAT('m:',m.message_id) AS id,m.sender_user_id AS sender_id,
                 COALESCE(a.role,'parent') AS sender_role,m.message_type AS type,m.created_at AS time
                 FROM messages m LEFT JOIN opsie_accounts a ON a.user_id=m.sender_user_id
-                WHERE m.conversation_id IN ({marks}) AND m.message_status='active' AND m.created_at >= %s
-                UNION ALL
-                SELECT CONCAT('h:',m.message_id),m.sender_user_id,COALESCE(a.role,'parent'),m.message_type,
-                DATE_ADD(m.created_at, INTERVAL d.offset_seconds SECOND)
-                FROM opsie_demo d JOIN messages m ON m.conversation_id=d.source_group_id
-                LEFT JOIN opsie_accounts a ON a.user_id=m.sender_user_id
-                WHERE d.group_id IN ({marks}) AND m.message_status='active'
-                AND m.created_at >= DATE_SUB(%s, INTERVAL d.offset_seconds SECOND)""", ids + [since] + ids + [since])
+                WHERE m.conversation_id IN ({marks}) AND m.message_status='active' AND m.message_type='text' AND m.created_at >= %s""", ids + [since])
             all_messages = cur.fetchall()
+            cur.execute(f"SELECT created_at FROM opsie_demo WHERE group_id IN ({marks})", ids)
+            for row in cur.fetchall():
+                if not getattr(conn, 'is_sqlite', False):
+                    all_messages.extend(m for m in demo_data.group_messages(row['created_at']) if m['time'] >= since)
         for message in all_messages:
             message['sender_id'] = str(message['sender_id']) if message['sender_id'] is not None else None
     with conn.cursor() as cur:
@@ -79,7 +76,7 @@ def data(conn, account):
         cur.execute("SELECT message_key,status,details,policy_version FROM opsie_inbound_reviews WHERE effective_time>=%s", (now()-timedelta(days=3),))
         reviews = {r["message_key"]: r for r in cur.fetchall()}
         cur.execute("SELECT message_key,conversation_id,sender_id,details,effective_time FROM opsie_inbound_reviews "
-                    "WHERE status='complete' AND is_sensitive=1 AND policy_version=%s AND effective_time>=%s AND effective_time<%s ORDER BY effective_time DESC",
+                    "WHERE status='complete' AND is_sensitive=1 AND message_key NOT LIKE 'h:%%' AND policy_version=%s AND effective_time>=%s AND effective_time<%s ORDER BY effective_time DESC",
                     (policy.load()["runtime_version"], now().replace(hour=0,minute=0,second=0,microsecond=0),
                      now().replace(hour=0,minute=0,second=0,microsecond=0)+timedelta(days=1)))
         risks = cur.fetchall()

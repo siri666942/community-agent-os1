@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 import os
 import re
 import ssl
+import time
 from queue import LifoQueue, Empty, Full
 from threading import BoundedSemaphore
 
@@ -34,18 +35,43 @@ def connect():
                            read_timeout=30, write_timeout=30, autocommit=False)
 
 
+def backend():
+    return os.environ.get('OPSIE_DB_BACKEND', 'sqlite').lower()
+
+
+def sqlite_path():
+    return Path(os.environ.get('OPSIE_SQLITE_PATH', ROOT / '.dbmcp' / 'opsie-demo.sqlite'))
+
+
 @contextmanager
 def transaction():
+    if backend() == 'sqlite':
+        from .sqlite_db import Connection
+        conn = Connection(sqlite_path())
+        try:
+            yield conn
+            conn.commit()
+        except BaseException:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+        return
+    if backend() != 'mysql':
+        raise ValueError('OPSIE_DB_BACKEND must be sqlite or mysql')
     _slots.acquire()
     conn = None
     reusable = False
     try:
         try:
-            conn = _idle.get_nowait()
+            conn, returned_at = _idle.get_nowait()
         except Empty:
             conn = connect()
         else:
-            conn.ping(reconnect=True)
+            # Recently used connections need no extra network round trip on every request.
+            # Revalidate idle connections before reuse, when server idle timeouts are likely.
+            if time.monotonic() - returned_at > 20:
+                conn.ping(reconnect=True)
         yield conn
         conn.commit()
         reusable = True
@@ -60,7 +86,7 @@ def transaction():
         if conn is not None:
             if reusable:
                 try:
-                    _idle.put_nowait(conn)
+                    _idle.put_nowait((conn, time.monotonic()))
                 except Full:
                     conn.close()
             else:

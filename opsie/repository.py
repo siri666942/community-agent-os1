@@ -2,7 +2,7 @@
 import json
 from datetime import timedelta
 from .db import now
-from . import profile
+from . import profile, demo_data
 
 
 def ensure_member(conn, account, cid):
@@ -30,7 +30,7 @@ def conversations(conn, account):
                     (account["user_id"], account["user_id"], account["user_id"]))
         rows = cur.fetchall()
     return [{"id": str(r["conversation_id"]), "type": r["conversation_type"],
-             "title": r["title"] or r["peer_name"] or "对话", "peer_id": str(r["peer_id"]) if r["peer_id"] else None}
+             "title": (demo_data.display_name(r['peer_id'], r['peer_name'] or '对话') if r['conversation_type']=='direct' else r['title'] or '阅读营群聊'), "peer_id": str(r["peer_id"]) if r["peer_id"] else None}
             for r in rows]
 
 
@@ -45,16 +45,8 @@ def messages(conn, account, cid, full=False):
           m.created_at AS original_time,m.source_system,COALESCE(m.reply_to_message_id,0) AS reply_to_message_id
           FROM messages m LEFT JOIN users u ON u.user_id=m.sender_user_id
           LEFT JOIN opsie_accounts a ON a.user_id=m.sender_user_id
-          WHERE m.conversation_id=%s AND m.message_status='active'"""
+          WHERE m.conversation_id=%s AND m.message_status='active' AND m.message_type='text'"""
         params = [cid]
-        if demo:
-            sql += """ UNION ALL SELECT CONCAT('h:',m.message_id),m.message_id,m.sender_user_id,
-              COALESCE(a.display_name,u.display_name,'未知用户'), COALESCE(a.role,'parent'),m.message_type,m.body,
-              DATE_ADD(m.created_at,INTERVAL %s SECOND),m.created_at,m.source_system,COALESCE(m.reply_to_message_id,0)
-              FROM messages m LEFT JOIN users u ON u.user_id=m.sender_user_id
-              LEFT JOIN opsie_accounts a ON a.user_id=m.sender_user_id
-              WHERE m.conversation_id=%s AND m.message_status='active'"""
-            params += [demo["offset_seconds"], demo["source_group_id"]]
         sql = "SELECT * FROM (" + sql + ") combined ORDER BY effective_time DESC,message_id DESC"
         if not full:
             sql += " LIMIT 100"
@@ -66,10 +58,15 @@ def messages(conn, account, cid, full=False):
         if r["message_type"] != "text":
             body = f"[{r['message_type']} 历史消息]" if not body else f"[{r['message_type']}] {body}"
         result.append({"id": r["message_key"], "sender_id": str(r["sender_user_id"]) if r["sender_user_id"] else None,
-                       "sender_name": r["sender_name"], "sender_role": r["sender_role"], "type": r["message_type"],
+                       "sender_name": demo_data.display_name(r['sender_user_id'], r['sender_name']), "sender_role": r["sender_role"], "type": r["message_type"],
                        "text": body, "time": r["effective_time"], "original_time": r["original_time"],
                        "source": "历史群" if r["message_key"].startswith("h:") else
                                  "演示初始私聊" if r["source_system"] == "opsie_demo_seed" else "现场消息"})
+    if demo and not getattr(conn, 'is_sqlite', False):
+        result.extend(demo_data.group_messages(demo['created_at']))
+        result.sort(key=lambda m: (m['time'], m['id']))
+        if not full:
+            result = result[-100:]
     return result
 
 
@@ -113,10 +110,11 @@ def user_profile(conn, account, uid):
             raise ValueError("用户不存在")
         cur.execute("SELECT tag,created_at FROM opsie_tags WHERE user_id=%s ORDER BY tag_id", (uid,))
         tags = cur.fetchall()
-        cur.execute("SELECT summary,updated_at FROM opsie_profile_cache WHERE user_id=%s", (uid,))
+        cur.execute("SELECT summary,updated_at,source_revision FROM opsie_profile_cache WHERE user_id=%s", (uid,))
         cache = cur.fetchone()
+        if cache and not (cache['source_revision'] or '').startswith('demo-safe-v1:'): cache = None
     result = profile.build(u["profile"])
-    result.update({"user_id": str(uid), "name": u["display_name"] or "家长", "manual_tags": tags,
+    result.update({"user_id": str(uid), "name": demo_data.display_name(uid, u["display_name"] or "家长"), "manual_tags": tags,
                    "summary": cache["summary"] if cache else None, "summary_updated_at": cache["updated_at"] if cache else None})
     return result
 
@@ -135,8 +133,8 @@ def user_profiles(conn, account, ids):
         tags = {}
         for row in cur.fetchall():
             tags.setdefault(str(row['user_id']), []).append({'tag': row['tag'], 'created_at': row['created_at']})
-        cur.execute(f"SELECT user_id,summary,updated_at FROM opsie_profile_cache WHERE user_id IN ({marks})", ids)
-        cache = {str(row['user_id']): row for row in cur.fetchall()}
+        cur.execute(f"SELECT user_id,summary,updated_at,source_revision FROM opsie_profile_cache WHERE user_id IN ({marks})", ids)
+        cache = {str(row['user_id']): row for row in cur.fetchall() if (row['source_revision'] or '').startswith('demo-safe-v1:')}
     result = []
     for uid in ids:
         key = str(uid)
@@ -144,7 +142,7 @@ def user_profiles(conn, account, ids):
             raise ValueError("用户不存在")
         user, saved = users[key], cache.get(key)
         item = profile.build(user['profile'])
-        item.update({'user_id': key, 'name': user['display_name'] or '家长', 'manual_tags': tags.get(key, []),
+        item.update({'user_id': key, 'name': demo_data.display_name(uid, user['display_name'] or '家长'), 'manual_tags': tags.get(key, []),
                      'summary': saved['summary'] if saved else None, 'summary_updated_at': saved['updated_at'] if saved else None})
         result.append(item)
     return result

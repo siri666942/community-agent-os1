@@ -1,7 +1,7 @@
 """Queue the demo's own recent historical parent messages for real risk detection."""
 from datetime import timedelta
 from . import ai, repository
-from .db import now, transaction
+from .db import now, transaction, backend
 
 
 def run():
@@ -14,16 +14,19 @@ def run():
                    "role": raw["role"], "display_name": raw["display_name"]}
         cur.execute("SELECT user_id FROM opsie_accounts WHERE role='parent' AND active=1")
         parent_ids = {str(r["user_id"]) for r in cur.fetchall()}
-        cur.execute("SELECT user_id FROM opsie_profile_cache")
+        cur.execute("SELECT user_id FROM opsie_profile_cache WHERE source_revision LIKE 'demo-safe-v1:%%'")
         cached = {str(r["user_id"]) for r in cur.fetchall()}
         conversations = repository.conversations(conn, account)
     for conv in conversations:
         with transaction() as conn:
             messages = repository.messages(conn, account, conv["id"], full=True)
         for message in messages:
-            if (message["sender_id"] in parent_ids and message["sender_role"] == "parent" and
+            if (message['source'] != '演示初始私聊' and message["sender_id"] in parent_ids and message["sender_role"] == "parent" and
                     message["type"] == "text" and message["time"] >= now() - timedelta(days=3)):
                 ai.assess_inbound(account, conv["id"], message)
+    # Fictional seed histories should not trigger a burst of model calls on startup.
+    if backend() == 'sqlite':
+        return
     for uid in parent_ids - cached:
         ai.EXECUTOR.submit(ai.refresh_summary, account, uid)
 

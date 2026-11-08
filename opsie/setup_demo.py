@@ -2,11 +2,14 @@
 import json
 import os
 import secrets
-from datetime import timedelta
+import shutil
+import sqlite3
+from datetime import datetime, timedelta
+from contextlib import closing
 from pathlib import Path
 
 from .auth import hash_password, verify_password
-from .db import ROOT, now, transaction
+from .db import ROOT, now, transaction, backend, sqlite_path
 
 DEMO = "reading-camp-v1"
 SOURCE_GROUP = 3
@@ -31,14 +34,22 @@ def setup():
     if credentials_path.exists():
         credentials = json.loads(credentials_path.read_text(encoding="utf-8"))
     else:
-        with transaction() as conn, conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='opsie_accounts'")
-            if cur.fetchone()["n"]:
-                cur.execute("SELECT COUNT(*) AS n FROM opsie_accounts")
+        if backend() == 'sqlite':
+            if sqlite_path().exists():
+                raise RuntimeError('本地数据库已存在但账号文件丢失，请恢复账号文件，不自动覆盖密码。')
+        else:
+            with transaction() as conn, conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='opsie_accounts'")
                 if cur.fetchone()["n"]:
-                    raise RuntimeError("演示账号已存在但本机账号文件丢失，请恢复账号文件，不自动覆盖密码。")
+                    cur.execute("SELECT COUNT(*) AS n FROM opsie_accounts")
+                    if cur.fetchone()["n"]:
+                        raise RuntimeError("演示账号已存在但本机账号文件丢失，请恢复账号文件，不自动覆盖密码。")
         credentials = {name: secrets.token_urlsafe(12) for name, _, _, _ in PEOPLE}
         credentials_path.write_text(json.dumps(credentials, ensure_ascii=False, indent=2), encoding="utf-8")
+    if backend() == 'sqlite':
+        setup_sqlite(credentials)
+        print('本地演示数据库已就绪；账号文件:', credentials_path)
+        return
     schema = (ROOT / "opsie" / "schema.sql").read_text(encoding="utf-8")
     with transaction() as conn:
         with conn.cursor() as cur:
@@ -111,6 +122,38 @@ def setup():
                                 (cid, uid, f"{DEMO}-seed-followup-{uid}",
                                  "老师，能把会员资料清单发我看看吗？我想一起比较一下。", now() - timedelta(minutes=5)))
     print("演示结构和账号已就绪；账号文件:", credentials_path)
+
+
+def setup_sqlite(credentials):
+    """Copy only the fictional seed on first run, preserving the live DB thereafter."""
+    path = sqlite_path()
+    if path.exists():
+        return
+    seed = ROOT / 'data' / 'opsie-demo.sqlite3'
+    if not seed.exists():
+        raise RuntimeError('缺少演示种子库 data/opsie-demo.sqlite3')
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + '.initializing')
+    if temporary.exists():
+        raise RuntimeError('发现未完成的本地数据库初始化文件，请检查后移走：' + str(temporary))
+    shutil.copyfile(seed, temporary)
+    try:
+        with closing(sqlite3.connect(temporary)) as conn, conn:
+            for username, _, _, _ in PEOPLE:
+                if username not in credentials:
+                    raise RuntimeError('本机账号文件缺少账号：' + username)
+                conn.execute('UPDATE opsie_accounts SET password_hash=? WHERE username=?', (hash_password(credentials[username]), username))
+            latest = conn.execute("SELECT MAX(created_at) FROM messages WHERE source_system='opsie_demo_seed'").fetchone()[0]
+            offset = now() - timedelta(minutes=5) - datetime.fromisoformat(latest)
+            rows = conn.execute("SELECT message_id,created_at FROM messages WHERE source_system='opsie_demo_seed'").fetchall()
+            conn.executemany('UPDATE messages SET created_at=? WHERE message_id=?',
+                             [((datetime.fromisoformat(at)+offset).isoformat(' '), mid) for mid, at in rows])
+            conn.execute('UPDATE opsie_demo SET created_at=?', (now().isoformat(' '),))
+            conn.execute('UPDATE conversations SET last_message_at=(SELECT MAX(created_at) FROM messages WHERE messages.conversation_id=conversations.conversation_id)')
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
 
 
 if __name__ == "__main__":

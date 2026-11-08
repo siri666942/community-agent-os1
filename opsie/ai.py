@@ -175,7 +175,7 @@ def job_status(conn, account, job_id):
     return {"job_id": row["job_id"], "conversation_id": str(row["conversation_id"]),
             "target_message_id": row["target_message_key"], "status": row["status"], "result": result,
             "error": row["error"], "stale": (history is not None and (revision(history) != row["context_revision"] or
-                                               not result or result.get('library_version') != library.snapshot()['version'])) or
+                                               not result or result.get('library_version') != library.snapshot(conn)['version'])) or
                                               policy.load()["runtime_version"] != row["policy_version"]}
 
 
@@ -324,7 +324,7 @@ def refresh_summary(account, uid):
         for conv in repository.conversations(conn, account):
             history.extend(m for m in repository.messages(conn, account, conv["id"], full=True)
                            if m["sender_id"] == str(uid) and m["sender_role"] == "parent" and m["type"] == "text")
-    output = call_model("根据真实阅读指标和家长本人发言，简短概括活跃情况、最近关注点和建议。营期末七天阅读数据是历史，不能表述为最近七天。"
+    output = call_model("根据提供的阅读指标和家长本人发言，简短概括活跃情况、最近关注点和建议。营期末七天阅读数据是历史，不能表述为最近七天。"
                         "不得编造报名、价格、试听或阅读行为。只输出 JSON 对象 {\"summary\":\"...\"}。",
                         {"profile": prof, "parent_messages": history}, max_tokens=1500)
     if not isinstance(output, dict) or not isinstance(output.get("summary"), str) or not output["summary"].strip():
@@ -332,5 +332,5 @@ def refresh_summary(account, uid):
     with transaction() as conn, conn.cursor() as cur:
         cur.execute("INSERT INTO opsie_profile_cache(user_id,summary,source_revision,updated_at) VALUES(%s,%s,%s,%s) "
                     "ON DUPLICATE KEY UPDATE summary=VALUES(summary),source_revision=VALUES(source_revision),updated_at=VALUES(updated_at)",
-                    (uid, output["summary"].strip(), revision(history), now()))
+                    (uid, output["summary"].strip(), 'demo-safe-v1:' + revision(history), now()))
     return output["summary"].strip()
