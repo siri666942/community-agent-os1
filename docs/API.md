@@ -109,7 +109,7 @@ GET /api/v1/profile/{uid}
 ## 6. 增值分析师 — 今日跟进名单
 
 ```
-GET /api/v1/growth/daily?limit=50
+GET /api/v1/growth/daily?limit=50[&uid=1405777]
 → 200 {
   "date": "2026-11-08", "total_customers": 157444, "sampled": 50,
   "segments": [
@@ -119,6 +119,10 @@ GET /api/v1/growth/daily?limit=50
   ], "note": "…置信度说明"
 }
 ```
+
+- `limit`:扫描面取 `max(limit*50, 5000)`,返回每层最多 10 条示例(全量可分页)
+- `uid`:只查单个客户(协作闭环验证用),返回其所在分层与最新依据
+- 意向信号来源:对话消息(含运营助手会话留痕,回流计入)+ 行为代理(链接点击/意向标签/测字,置信度标 `low`)
 
 ```
 GET /api/v1/growth/report   → 分层分布(工作台用)
