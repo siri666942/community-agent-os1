@@ -6,6 +6,7 @@ const state = {token:sessionStorage.getItem('opsie.token'), user:null, conversat
 let toastTimer;
 let dashboardRequest=null;
 let draftRequest=0;
+let libraryItems=[];
 function dashboardCacheKey(){return 'opsie.dashboard.'+state.user.user_id}
 function toast(message){const el=$('#toast');el.textContent=message;el.classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.add('hidden'),4000);}
 async function api(path, options={}){
@@ -22,18 +23,27 @@ function showPage(page){
   $('#page-title').textContent=({workspace:'工作台',chat:state.user.role==='parent'?'阅读营消息':'客户对话',profiles:'用户画像',sop:'SOP 流程',rules:'话术与质检'})[page];
   if(page==='workspace'||page==='profiles') loadDashboard();
   if(page==='sop') loadSop();
-  if(page==='rules') api('/api/v1/policy').then(renderPolicy).catch(e=>toast(e.message));
+  if(page==='rules') loadLibrary();
 }
 async function loadSop(){
   try{const data=await api('/api/v1/sop');$('#sop-content').innerHTML=Object.entries(data.days).map(([day,entries])=>
     `<details><summary><b>${esc(day)}</b> · ${entries.length} 项</summary>${entries.map(e=>`<div class="profile-section"><strong>${esc(e.time||'运营安排')}</strong><p>${esc(e.scene||'')} ${esc(e.target||'')}</p>${(Array.isArray(e.scripts)?e.scripts:[]).map(s=>`<p class="sop-script">${esc(s)}</p>`).join('')}${e.note?`<p>${esc(e.note)}</p>`:''}</div>`).join('')}</details>`).join('')}
   catch(e){$('#sop-content').textContent='暂时无法加载 SOP：'+e.message}
 }
-function renderPolicy(p){
-  const labels={'product.catalog':'产品与权益','product.pricing':'价格','product.promotions':'优惠活动','refund.policy':'退费规则','product.access_after_expiry':'到期后使用','product.assessment_trial':'测评与试听','product.teacher_service':'老师服务'};
-  const valueText=v=>typeof v==='string'?v:Array.isArray(v)?v.map(valueText).join('；'):v&&typeof v==='object'?Object.entries(v).map(([k,x])=>`${k}：${valueText(x)}`).join('；'):String(v??'');
-  $('#policy-content').innerHTML=Object.entries(labels).map(([key,label])=>{const entry=p.product[key];return `<p><b>${esc(label)}：</b>${entry?.status==='confirmed'&&entry.value!==null?esc(valueText(entry.value)):'待确认'}</p>`}).join('');
-  $('#policy-version').textContent='当前口径版本 '+p.version;
+async function loadLibrary(){try{const data=await api('/api/v1/library');libraryItems=data.items;renderLibrary()}catch(e){$('#library-content').innerHTML=`<div class="panel document">加载失败：${esc(e.message)} <button class="outline" id="library-retry">重试</button></div>`;$('#library-retry').onclick=loadLibrary}}
+function renderLibrary(){
+  const query=$('#library-search').value.trim().toLowerCase(),filtered=libraryItems.filter(e=>(e.title+' '+e.content).toLowerCase().includes(query));
+  const panel=(kind,label,title)=>{const entries=filtered.filter(e=>e.kind===kind),count=libraryItems.filter(e=>e.kind===kind).length;
+    return `<article class="panel library-card"><div class="library-card-heading"><div><span class="eyebrow">${label}</span><h3>${title}</h3></div><span class="library-count">${count} 条</span><button class="library-add" data-lib-add="${kind}" aria-label="新增${title}">＋</button></div><div class="library-list">${entries.map(e=>`<div class="library-row ${kind==='risk'?'library-risk':''}">${kind==='risk'?`<div><span class="risk-badge ${e.level}">${e.level==='red'?'高风险':'需核对'}</span><strong>${esc(e.title)}</strong></div><p>${esc(e.content)}</p>`:`<span class="library-title">${esc(e.title)}</span><p>${esc(e.content)}</p>`}<div class="library-actions"><button type="button" data-lib-edit="${esc(e.entry_id)}" aria-label="编辑${esc(e.title)}">✎</button><button type="button" data-lib-delete="${esc(e.entry_id)}" aria-label="删除${esc(e.title)}">×</button></div></div>`).join('')||'<div class="empty">暂无条目</div>'}</div></article>`};
+  $('#library-content').innerHTML=panel('standard','公司话术库','标准口径')+panel('risk','禁止词与风险动作','质检规则');
+  document.querySelectorAll('[data-lib-add]').forEach(b=>b.onclick=()=>editLibrary(b.dataset.libAdd));
+  document.querySelectorAll('[data-lib-edit]').forEach(b=>b.onclick=()=>{const e=libraryItems.find(x=>String(x.entry_id)===b.dataset.libEdit);if(e)editLibrary(e.kind,e)});
+  document.querySelectorAll('[data-lib-delete]').forEach(b=>b.onclick=async()=>{const e=libraryItems.find(x=>String(x.entry_id)===b.dataset.libDelete);if(!e||!confirm('确定删除“'+e.title+'”？'))return;b.disabled=true;try{await post('/api/v1/library',{id:e.entry_id,delete:true});await loadLibrary();toast('已删除')}catch(err){toast(err.message);b.disabled=false}});
+}
+$('#library-search').oninput=renderLibrary;
+function editLibrary(kind,entry=null){
+  const label=kind==='standard'?'标准口径':'质检规则';$('#modal-content').innerHTML=`<h3>${entry?'编辑':'新增'}${label}</h3><form id="library-form" class="library-form"><label>标题<input name="title" required maxlength="120" value="${esc(entry?.title||'')}" placeholder="输入标题"></label>${kind==='risk'?`<label>风险级别<select name="level"><option value="red" ${entry?.level==='red'?'selected':''}>高风险 · 需修改</option><option value="yellow" ${entry?.level==='yellow'?'selected':''}>需核对 · 确认后发送</option></select></label>`:''}<label>内容<textarea name="content" required maxlength="4000" rows="7" placeholder="输入${label}内容">${esc(entry?.content||'')}</textarea></label><p class="muted">保存后供 AI 生成和质检参考；已有基础质检仍会生效。</p><div class="library-form-actions"><button type="button" class="outline" id="cancel-library">取消</button><button type="submit" class="primary">保存</button></div><p id="library-error" class="error" role="alert"></p></form>`;
+  $('#modal').classList.remove('hidden');$('#cancel-library').onclick=()=>$('#modal').classList.add('hidden');$('#library-form').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('[type=submit]');button.disabled=true;$('#library-error').textContent='';try{await post('/api/v1/library',{id:entry?.entry_id,kind,title:form.elements.title.value,content:form.elements.content.value,level:form.elements.level?.value});$('#modal').classList.add('hidden');await loadLibrary();toast('已保存')}catch(err){$('#library-error').textContent=err.message}finally{button.disabled=false}};
 }
 function start(user){
   state.user=user;$('#login-screen').classList.add('hidden');$('#app').classList.remove('hidden');

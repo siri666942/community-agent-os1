@@ -57,6 +57,23 @@ def setup():
                 else:
                     cur.execute("INSERT INTO opsie_accounts(username,password_hash,role,user_id,display_name) VALUES(%s,%s,%s,%s,%s)",
                                 (username, hash_password(credentials[username]), role, uid, name))
+            cur.execute("INSERT IGNORE INTO opsie_library_meta(meta_key,created_at) VALUES('initial_library',%s)", (now(),))
+            if cur.rowcount:
+                cur.execute("SELECT account_id FROM opsie_accounts WHERE username='teacher'")
+                teacher_account = cur.fetchone()['account_id']
+                defaults = [
+                    ('standard','产品与权益','具体产品权益待确认，请先核实。',None),
+                    ('standard','价格与优惠','价格和活动待确认，请先核实当前适用口径。',None),
+                    ('standard','退费规则','先理解家长诉求，具体退费规则需核实，不承诺随时退或一律不能退。',None),
+                    ('standard','测评与试听','是否免费及预约方式待确认，请先核实。',None),
+                    ('risk','绝对效果承诺','不得保证每个孩子必然达到某个阅读效果或识字数量。','red'),
+                    ('risk','退款承诺','不得擅自承诺随时退或无条件退款。','red'),
+                    ('risk','群聊隐私','不得在群里披露孩子或家庭的个人隐私。','red'),
+                    ('risk','未经核实的价格与优惠','不得承诺未经核实的价格、锁价或优惠。','yellow'),
+                    ('risk','夸大师资或效果','师资和效果描述需要事实依据，不确定时先核实。','yellow'),
+                ]
+                cur.executemany("INSERT INTO opsie_library_entries(kind,title,content,level,updated_by,updated_at) VALUES(%s,%s,%s,%s,%s,%s)",
+                                [(kind,title,content,level,teacher_account,now()) for kind,title,content,level in defaults])
             cur.execute("SELECT * FROM opsie_demo WHERE demo_key=%s", (DEMO,))
             demo = cur.fetchone()
             if not demo:

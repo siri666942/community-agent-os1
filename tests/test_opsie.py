@@ -4,7 +4,7 @@ import copy
 from datetime import timedelta
 from unittest.mock import patch, MagicMock
 
-from opsie import ai, auth, dashboard, profile
+from opsie import ai, auth, dashboard, profile, library
 from opsie.db import now
 
 
@@ -56,7 +56,7 @@ class QualityTests(unittest.TestCase):
             {'variant': 'A', 'text': '您好', 'qc': {'status': 'green', 'risks': [], 'suggestion': None}},
             {'variant': 'B', 'text': '可以随时退款', 'qc': {'status': 'red', 'risks': [], 'suggestion': '修改'}},
         ]
-        with patch('opsie.ai.call_model', side_effect=RuntimeError('offline')):
+        with patch('opsie.ai.call_model', side_effect=RuntimeError('offline')), patch('opsie.ai.library.snapshot', return_value={'entries': []}):
             result = ai.review_candidates(drafts, 'direct')
         self.assertEqual([d['qc']['status'] for d in result], ['pending', 'red'])
 
@@ -68,7 +68,7 @@ class QualityTests(unittest.TestCase):
 
     def test_denial_goes_to_semantic_review(self):
         response = {"status": "green", "risks": [], "suggestion": ""}
-        with patch("opsie.ai.call_model", return_value=response) as model:
+        with patch("opsie.ai.call_model", return_value=response) as model, patch('opsie.ai.library.snapshot', return_value={'entries': []}):
             self.assertEqual(ai.review_outbound("我不承诺随时退款，具体规则先核实。", "direct")["status"], "green")
             model.assert_called_once()
 
@@ -126,6 +126,7 @@ class AutoDraftTests(unittest.TestCase):
              patch('opsie.ai.target_and_context', return_value=(target, history)), \
              patch('opsie.ai.repository.ensure_member', return_value={'conversation_type': 'direct'}), \
              patch('opsie.ai.dashboard.profile_for', return_value={'name': '家长'}), \
+             patch('opsie.ai.library.snapshot', return_value={'entries': [], 'version': 'test'}), \
              patch('opsie.ai.sop_reference', return_value=[{'scene': '私聊'}]), \
              patch('opsie.ai.teammate_assistant.normalize_model_drafts', return_value=[]), \
              patch('opsie.ai.review_candidates', return_value=[]), \
@@ -139,6 +140,28 @@ class AutoDraftTests(unittest.TestCase):
         self.assertEqual(data['sop_reference'], [{'scene': '私聊'}])
         self.assertIn('quality_guidance', data)
         self.assertEqual(update.call_args.args[1], 'succeeded')
+
+
+class LibraryTests(unittest.TestCase):
+    def test_invalid_rules_are_rejected(self):
+        account = {'account_id': '1'}
+        for item in ({'kind': 'risk', 'title': '规则', 'content': '内容', 'level': 'green'},
+                     {'kind': 'standard', 'title': '', 'content': '内容'},
+                     {'kind': 'standard', 'title': '标题', 'content': ' '}):
+            with self.assertRaises(ValueError):
+                library.save(MagicMock(), account, item)
+
+    def test_library_change_marks_suggestions_stale(self):
+        conn = MagicMock()
+        conn.cursor.return_value.__enter__.return_value.fetchone.return_value = {
+            'job_id': 'j', 'conversation_id': '1', 'target_message_key': 'm:1', 'status': 'succeeded',
+            'result': {'drafts': [], 'library_version': 'old'}, 'error': None,
+            'context_revision': ai.revision([]), 'policy_version': 'current'}
+        with patch('opsie.ai.repository.messages', return_value=[]), \
+             patch('opsie.ai.library.snapshot', return_value={'version': 'new', 'entries': []}), \
+             patch('opsie.ai.policy.load', return_value={'runtime_version': 'current'}):
+            result = ai.job_status(conn, {'account_id': '1'}, 'j')
+        self.assertTrue(result['stale'])
 
 
 if __name__ == "__main__":

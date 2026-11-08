@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import ai, auth, dashboard, policy, repository
+from . import ai, auth, dashboard, policy, repository, library
 from .db import ROOT, json_default, now, transaction
 
 WEB = ROOT / "web"
@@ -39,8 +39,8 @@ def refresh_policy_tasks():
     ai.EXECUTOR.submit(run_backfill)
 
 
-def confirmation(account, cid, text):
-    msg = json.dumps([account["account_id"], str(cid), text, policy.load()["runtime_version"]], ensure_ascii=False).encode()
+def confirmation(account, cid, text, library_version=''):
+    msg = json.dumps([account["account_id"], str(cid), text, policy.load()["runtime_version"], library_version], ensure_ascii=False).encode()
     return hmac.new(SECRET, msg, hashlib.sha256).hexdigest()
 
 
@@ -142,6 +142,9 @@ class Handler(BaseHTTPRequestHandler):
                     keys = ["product.catalog", "product.pricing", "product.promotions", "refund.policy", "product.access_after_expiry", "product.assessment_trial", "product.teacher_service"]
                     entries = {key: {"status": doc["policies"][key]["status"], "value": doc["policies"][key]["value"]} for key in keys}
                     return self.send_json(200, {"version": doc["runtime_version"], "rules": policy.confirmed_facts(doc), "product": entries})
+                if path == "/api/v1/library":
+                    if user['role'] != 'teacher': raise PermissionError('仅老师可查看话术与质检规则')
+                    return self.send_json(200, {'items': library.list_entries(conn)})
             return self.send_json(404, {"error": "接口不存在"})
         except PermissionError as exc:
             return self.send_json(403, {"error": str(exc)})
@@ -203,6 +206,13 @@ class Handler(BaseHTTPRequestHandler):
                             cur.execute("INSERT IGNORE INTO opsie_tags(user_id,tag,account_id,created_at) VALUES(%s,%s,%s,%s)",
                                         (uid, tag, user["account_id"], now()))
                     result = {"ok": True}
+                if path == '/api/v1/library':
+                    if user['role'] != 'teacher': raise PermissionError('仅老师可管理话术与质检规则')
+                    if data.get('delete'):
+                        library.delete(conn, data.get('id'))
+                        result = {'ok': True}
+                    else:
+                        result = {'id': library.save(conn, user, data)}
             if result is not None:
                 return self.send_json(200, result)
             return self.send_json(404, {"error": "接口不存在"})
@@ -231,18 +241,21 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(200, {"message_id": str(old["message_id"]), "duplicate": True})
         if user["role"] == "teacher":
             review_version = policy.load()["runtime_version"]
-            result = ai.review_outbound(text, conversation["conversation_type"])
+            library_data = library.snapshot()
+            result = ai.review_outbound(text, conversation["conversation_type"], library_data)
             if policy.load()["runtime_version"] != review_version:
                 raise RuntimeError("质检口径刚刚更新，请重新发送以完成审核")
+            if library.snapshot()['version'] != library_data['version']:
+                raise RuntimeError("话术或质检规则刚刚更新，请重新发送以完成审核")
             status = result["status"]
-            needed = status == "yellow" and not hmac.compare_digest(str(data.get("confirmation", "")), confirmation(user, cid, text))
+            needed = status == "yellow" and not hmac.compare_digest(str(data.get("confirmation", "")), confirmation(user, cid, text, library_data['version']))
             if status == "red" or needed:
                 with transaction() as conn, conn.cursor() as cur:
                     cur.execute("INSERT INTO opsie_outbound_reviews(conversation_id,account_id,text_hash,status,details,policy_version,created_at) VALUES(%s,%s,%s,%s,%s,%s,%s)",
                                 (cid, user["account_id"], hashlib.sha256(text.encode()).hexdigest(), status,
                                  json.dumps(result, ensure_ascii=False), policy.load()["runtime_version"], now()))
                 return self.send_json(409, {"error": "请修改回复" if status == "red" else "请核对风险后确认发送",
-                                            "review": result, "confirmation": confirmation(user, cid, text) if needed else None})
+                                            "review": result, "confirmation": confirmation(user, cid, text, library_data['version']) if needed else None})
         with transaction() as conn:
             mid, created = repository.insert_message(conn, user, cid, client_id, text)
             if user["role"] == "teacher" and created:

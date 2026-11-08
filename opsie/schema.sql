@@ -84,3 +84,19 @@ CREATE TABLE IF NOT EXISTS opsie_profile_cache (
   source_revision VARCHAR(120) NOT NULL,
   updated_at DATETIME(3) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS opsie_library_entries (
+  entry_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  kind ENUM('standard','risk') NOT NULL,
+  title VARCHAR(120) NOT NULL,
+  content TEXT NOT NULL,
+  level ENUM('red','yellow') NULL,
+  updated_by BIGINT UNSIGNED NOT NULL,
+  updated_at DATETIME(3) NOT NULL,
+  INDEX opsie_library_kind (kind,entry_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS opsie_library_meta (
+  meta_key VARCHAR(80) PRIMARY KEY,
+  created_at DATETIME(3) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
