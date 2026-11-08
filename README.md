@@ -17,6 +17,20 @@ Opsie 是面向儿童阅读营的黑客松演示项目。老师可以在同一�
 2. 在项目目录运行 `start-opsie.cmd`，然后打开 <http://127.0.0.1:8780/>。脚本首次启动会将纯虚构种子 `data/opsie-demo.sqlite3` 复制到本机 `.dbmcp/opsie-demo.sqlite`，并生成本机账号密码。
 3. 老师及四位家长的演示账号密码保存在本机 `.dbmcp/demo-accounts.json`。多台设备访问同一个服务的局域网地址；一台设备也可使用多个独立页面分别登录。
 
+### 在线演示账号
+
+打开 [在线演示](https://85.121.122.124:30003/)，使用以下账号登录：
+
+| 角色 | 账号 | 密码 |
+| --- | --- | --- |
+| 老师 | `teacher` | `nB2Vls8sFBQdKqLP` |
+| 小禾妈妈 | `parent1` | `OhDj4A92A_wKiMN-` |
+| 乐乐妈妈 | `parent2` | `GVFSanhVIxtDrsZM` |
+| 朵朵爸爸 | `parent3` | `tw_tksG6INyJLeBF` |
+| 安安妈妈 | `parent4` | `ssT7JJVS5Sz4i6Cz` |
+
+以上账号适用于当前在线演示。本机首次启动时会生成独立的随机密码，以本机 `.dbmcp/demo-accounts.json` 中的内容为准。
+
 本机运行库会保存现场消息和规则修改，不会自动提交到 Git。种子包含四个私聊各 16 条、群聊 64 条虚构消息与虚构画像，没有原始客户记录、现场聊天或密码。既有 MySQL 接入仍可使用：设置 `OPSIE_DB_BACKEND=mysql`，并按 [使用说明](Opsie使用说明.md) 提供数据库配置；两个库的数据不会自动互相同步。
 
 停止服务可运行 `stop-opsie.ps1`。模型、数据库配置、账号、局域网使用以及演示时间调整的详细步骤见 [Opsie 使用说明](Opsie使用说明.md)。
