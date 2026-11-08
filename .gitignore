@@ -39,3 +39,10 @@ __MACOSX/
 
 # Local web backup (old version)
 _backup/
+
+# Opsie local credentials, TLS pins, virtual environments and runtime state
+/.dbmcp/
+/.dbmcp-venv/
+/.opsie-venv/
+/.codex/config.toml
+/配置文件文字版.txt

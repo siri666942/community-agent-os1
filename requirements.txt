@@ -1,2 +1,4 @@
 openpyxl
 python-docx
+pymysql[rsa]>=1.1.2,<2
+tzdata>=2025.2; platform_system == "Windows"

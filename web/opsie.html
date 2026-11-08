@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Opsie 阅读营工作台</title>
+  <link rel="stylesheet" href="/opsie.css?v=20261108-2">
+</head>
+<body>
+  <section id="login-screen" class="login-screen">
+    <div class="login-card">
+      <div class="brand-mark">O</div><span class="eyebrow">OPSIE · 阅读营工作台</span>
+      <h1>让每一次沟通<br>更有温度</h1>
+      <p>登录后进入阅读营。老师可以查看会话和 AI 建议，家长可以与老师交流。</p>
+      <form id="login-form">
+        <label>账号<input id="username" autocomplete="username" required></label>
+        <label>密码<input id="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit" class="primary wide">登录</button>
+        <p id="login-error" class="error" role="alert"></p>
+      </form>
+    </div>
+  </section>
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">O</div><div><strong>Opsie</strong><small>阅读营工作台</small></div></div>
+      <nav id="navigation">
+        <button class="nav active teacher-only" data-page="workspace">▦ <span>工作台</span></button>
+        <button class="nav" data-page="chat">◌ <span>客户对话</span></button>
+        <button class="nav teacher-only" data-page="profiles">♙ <span>用户画像</span></button>
+        <button class="nav teacher-only" data-page="sop">☷ <span>SOP 流程</span></button>
+        <button class="nav teacher-only" data-page="rules">◇ <span>话术与质检</span></button>
+      </nav>
+      <div class="sidebar-bottom"><div class="avatar" id="self-avatar">老</div><div><strong id="self-name"></strong><small id="self-role"></small></div><button id="logout" class="link">退出</button></div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><div><span class="eyebrow">OPSIE · READING CAMP</span><h2 id="page-title">工作台</h2></div><span class="top-note">陪伴每一次成长 ✦</span></header>
+      <section id="page-workspace" class="page"><div id="dashboard-content"></div></section>
+      <section id="page-chat" class="page hidden">
+        <div class="chat-layout">
+          <aside class="conversations panel"><div class="section-title"><div><span class="eyebrow">MESSAGES</span><h3>会话</h3></div></div><input id="search" class="search" placeholder="搜索会话"><div id="conversation-list" class="conversation-list"></div></aside>
+          <section class="chat-column panel">
+            <header class="chat-head"><div><strong id="chat-title">选择一个会话</strong><small id="chat-subtitle">查看消息并开始交流</small></div><button id="load-history" class="subtle">查看全部历史</button></header>
+            <div id="messages" class="message-stage"><div class="empty">选择左侧会话开始交流</div></div>
+            <div id="inbound-alert" class="inbound-alert hidden"></div>
+            <section id="assistant-panel" class="assistant-panel teacher-only"><div class="assistant-heading"><div><span class="eyebrow">AI ASSISTANT</span><h3>AI 建议回复</h3><p id="draft-hint">选择一条家长消息，结合上下文生成建议。</p></div><button id="generate" class="outline">生成建议</button></div><div id="drafts" class="draft-list"></div></section>
+            <form id="send-form" class="composer"><textarea id="message-input" rows="2" maxlength="6000" placeholder="输入消息…"></textarea><div class="composer-footer"><span id="send-status">按 Enter 发送，Shift + Enter 换行</span><button id="send-button" type="submit" class="primary">发送消息 ↗</button></div></form>
+          </section>
+          <aside id="chat-profile" class="profile-side panel teacher-only"><div class="empty">选择家长消息后查看画像</div></aside>
+        </div>
+      </section>
+      <section id="page-profiles" class="page hidden"><div class="page-heading"><span class="eyebrow">CUSTOMER INSIGHTS</span><h2>用户画像</h2><p>根据阅读行为和对话记录了解每位家长。</p></div><div id="profile-cards" class="profile-grid"></div></section>
+      <section id="page-sop" class="page hidden"><div class="page-heading"><span class="eyebrow">READING CAMP</span><h2>SOP 流程</h2><p>21 天阅读营服务参考</p></div><article class="panel document"><h3>阅读营运营参考</h3><p class="muted">以下为已有营期资料，价格与活动等内容请以当前标准口径为准。</p><div id="sop-content">正在加载…</div></article></section>
+      <section id="page-rules" class="page hidden"><div class="page-heading"><span class="eyebrow">QUALITY CHECK</span><h2>话术与质检</h2><p>关注家长提问中的敏感问题，并在发送前检查最终回复。</p></div><div class="rules-grid"><article class="panel document"><h3>当前处理原则</h3><p>敏感提问会提醒老师关注。涉及未经核实的退款承诺、效果保证，以及群内披露个人隐私时，需修改后发送。</p><p>先安抚、再核实，必要时引导家长私聊。每条消息均由老师确认发送。</p></article><article class="panel document"><h3>产品标准口径</h3><div id="policy-content"><p>正在加载当前口径…</p></div><p id="policy-version" class="muted"></p></article></div></section>
+    </main>
+  </div>
+  <div id="modal" class="modal hidden"><div class="modal-card panel"><button class="modal-close" id="close-modal">×</button><div id="modal-content"></div></div></div>
+  <div id="toast" class="toast hidden" role="status"></div>
+  <script src="/opsie.js?v=20261108-2"></script>
+</body>
+</html>
