@@ -19,6 +19,34 @@ EXECUTOR = ThreadPoolExecutor(max_workers=5, thread_name_prefix="opsie-ai")
 
 
 def call_model(system, data, max_tokens=2600):
+    provider_config = os.environ.get("OPSIE_CHAT_CONFIG_FILE")
+    if provider_config:
+        with open(provider_config, encoding="utf-8-sig") as f:
+            provider = json.load(f)
+        model = os.environ.get("OPC_MODEL") or provider["models"][0]
+        body = {"model": model, "max_tokens": max_tokens,
+                "messages": [{"role": "system", "content": system},
+                             {"role": "user", "content": json.dumps(data, ensure_ascii=False, default=json_default)}]}
+        req = urllib.request.Request(provider["chat"].rstrip("/") + "/chat/completions",
+                                     data=json.dumps(body, ensure_ascii=False).encode(),
+                                     headers={"Authorization": "Bearer " + provider["key"],
+                                              "content-type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=150) as response:
+                result = json.load(response)
+        except (OSError, urllib.error.HTTPError) as exc:
+            raise RuntimeError("模型服务暂不可用，请稍后重试") from exc
+        choices = result.get("choices") or []
+        if not choices or choices[0].get("finish_reason") != "stop":
+            raise RuntimeError("模型响应未完整完成")
+        text = (choices[0].get("message", {}).get("content") or "").strip()
+        if not text:
+            raise RuntimeError("模型未返回可用文本")
+        text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.I)
+        try:
+            return json.loads(text)
+        except ValueError as exc:
+            raise RuntimeError("模型返回格式无效") from exc
     base = os.environ.get("OPC_MAGPIE_BASE_URL", "http://127.0.0.1:3425").rstrip("/")
     model = os.environ.get("OPC_MODEL", "sophnet/DeepSeek-V4.1-Flash-1017")
     body = {"model": model, "max_output_tokens": max_tokens,

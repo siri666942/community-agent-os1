@@ -199,9 +199,10 @@ async function loadDashboard(){
 }
 function renderDashboard(){
   const d=state.dashboard;if(!d)return;
+  const demoFollowups={'201':['阅读陪伴','关注自主阅读与后续会员安排'], '198':['阅读习惯','关心阅读节奏与会员价格'], '194':['兴趣引导','从恐龙绘本出发，关注阅读资料'], '176':['温和陪伴','关注阅读兴趣与识字起步']};
   $('#dashboard-content').innerHTML=`<div class="welcome"><div><span class="eyebrow">HELLO, TEACHER</span><h2>今天也好好陪伴每一位家长</h2><p>关注真实互动，让每一次回复更从容。</p></div><button class="outline" id="go-chat">进入接待 →</button></div>
   <div class="metric-grid"><button class="metric panel" data-metric="today"><span>今日会话</span><strong>${d.today_conversations}</strong><small>今天发言的家长</small></button><button class="metric panel" data-metric="risk"><span>质检拦截</span><strong>${d.qc_count}</strong><small>需要关注的家长消息</small></button><button class="metric panel" data-metric="intent"><span>高意向用户</span><strong>${d.high_intent}</strong><small>近三日对话信号</small></button></div>
-  <section class="panel follow-card"><div class="section-title"><div><span class="eyebrow">TODAY'S FOLLOW-UP</span><h3>今日跟进</h3><small id="dashboard-status" aria-live="polite"></small></div><button class="subtle" id="refresh-dashboard">刷新</button></div><div class="follow-list">${d.profiles.map(p=>`<div class="follow-row"><span class="avatar">${esc(p.name.slice(0,1))}</span><div><strong>${esc(p.name)}</strong><p>${esc(p.summary||`${p.activity.window}：${p.activity.active_days} 天，日均 ${p.activity.avg_minutes} 分钟`)} · 意向${esc(p.intent.level)}</p></div><button class="outline" data-open-user="${esc(p.user_id)}">查看对话</button></div>`).join('')}</div></section>`;
+  <section class="panel follow-card"><div class="section-title"><div><span class="eyebrow">TODAY'S FOLLOW-UP</span><h3>今日跟进</h3><small id="dashboard-status" aria-live="polite"></small></div><button class="subtle" id="refresh-dashboard">刷新</button></div><div class="follow-list follow-overview">${d.profiles.map(p=>{const brief=demoFollowups[String(p.user_id)]||['了解近况','查看画像与对话，了解家长近况'];return `<div class="follow-row follow-brief"><span class="avatar">${esc(p.name.slice(0,1))}</span><div class="follow-brief-copy"><div class="follow-name"><strong>${esc(p.name)}</strong><span class="follow-topic">${esc(brief[0])}</span></div><p>${esc(brief[1])}</p></div><button class="outline" data-open-user="${esc(p.user_id)}">查看对话 →</button></div>`}).join('')}</div></section>`;
   $('#go-chat').onclick=()=>showPage('chat');$('#refresh-dashboard').onclick=loadDashboard;
   document.querySelectorAll('[data-open-user]').forEach(b=>b.onclick=()=>openUser(b.dataset.openUser));
   document.querySelectorAll('[data-metric]').forEach(b=>b.onclick=()=>showMetric(b.dataset.metric));
@@ -216,6 +217,33 @@ function showMetric(type){
 }
 $('#close-modal').onclick=()=>$('#modal').classList.add('hidden');
 function openUser(uid){const conv=state.conversations.find(c=>c.type==='direct'&&c.peer_id===uid);if(conv)openConversation(conv.id);else toast('暂无私聊');}
-function renderProfiles(){const root=$('#profile-cards');root.innerHTML=(state.dashboard?.profiles||[]).map(p=>`<article class="panel profile-card" data-profile-card="${esc(p.user_id)}">${profileMarkup(p)}</article>`).join('');bindProfileButtons(root)}
+let profileFilter='all', selectedProfile=null;
+function renderProfiles(){
+  const root=$('#profile-cards'), profiles=state.dashboard?.profiles||[];
+  const high=p=>p.intent?.level==='高', low=p=>p.activity?.level==='低';
+  const shown=profiles.filter(p=>profileFilter==='all'||(profileFilter==='high'?high(p):low(p)));
+  if(!shown.some(p=>p.user_id===selectedProfile)) selectedProfile=shown[0]?.user_id||null;
+  const p=shown.find(x=>x.user_id===selectedProfile);
+  const filter=(key,label,count)=>`<button type="button" data-profile-filter="${key}" class="profile-filter ${profileFilter===key?'active':''}" aria-pressed="${profileFilter===key}">${label} <span>${count}</span></button>`;
+  const list=shown.map(item=>`<button type="button" class="profile-person ${item.user_id===selectedProfile?'active':''}" data-select-profile="${esc(item.user_id)}" aria-pressed="${item.user_id===selectedProfile}"><span class="profile-avatar">${esc(item.name?.slice(0,1)||'家')}</span><span class="profile-person-copy"><strong>${esc(item.name)}</strong><small>意向${esc(item.intent?.level||'待识别')} · ${item.activity?.level==='数据不足'?'阅读数据不足':esc(item.activity?.level||'未知')+'活跃'}</small></span><span class="profile-chevron">›</span></button>`).join('');
+  let detail='<div class="panel profile-empty"><div>⌕</div><strong>暂无符合条件的用户</strong><p>试试切换其他筛选条件。</p></div>';
+  if(p){
+    const a=p.activity||{}, intent=p.intent||{}, days=a.daily||[], max=Math.max(1,...days.map(d=>Number(d.minutes)||0));
+    const tags=(p.manual_tags||[]).map(t=>`<span class="profile-tag">${esc(t.tag)} <button class="subtle" data-remove-tag="${esc(t.tag)}" data-uid="${esc(p.user_id)}" aria-label="删除标签 ${esc(t.tag)}">×</button></span>`).join('');
+    const chart=days.map((d,i)=>`<div class="reading-day"><div class="reading-bar-track"><span class="reading-bar ${d.read===false?'rest':''}" style="height:${d.minutes==null?0:Math.max(4,Math.round((Number(d.minutes)||0)/max*100))}%"></span></div><span>第${15+i}天</span><small>${d.minutes==null?'—':esc(d.minutes)+'分'}</small></div>`).join('');
+    detail=`<article class="panel profile-detail"><header class="profile-hero"><span class="profile-avatar profile-avatar-large">${esc(p.name?.slice(0,1)||'家')}</span><div class="profile-identity"><span class="eyebrow">PARENT PROFILE</span><h3>${esc(p.name)}</h3><p>阅读营家长 · ${esc(a.window||'阅读数据')}</p><div class="chips"><span class="chip">意向${esc(intent.level||'待识别')}</span><span class="chip">${a.level==='数据不足'?'阅读数据不足':esc(a.level||'未知')+'活跃'}</span></div></div><button class="outline" data-profile-chat="${esc(p.user_id)}">查看对话 →</button></header>
+    <div class="profile-detail-grid"><div class="profile-detail-main"><section class="insight-card"><div class="insight-title"><div><span class="eyebrow">BEHAVIOR SUMMARY</span><h4>最近行为概括</h4></div><button class="subtle" data-summary="${esc(p.user_id)}">↻ 生成概括</button></div><div class="insight-summary">${esc(p.summary||'尚未生成行为概括，可结合阅读行为和家长发言生成。')}</div>${p.summary_updated_at?`<small>更新于 ${esc(String(p.summary_updated_at).slice(0,16))}</small>`:''}</section>
+    <section class="insight-card"><div class="insight-title"><div><span class="eyebrow">READING ACTIVITY</span><h4>阅读行为</h4></div><span class="insight-caption">${esc(a.window||'营期末 7 天阅读')}</span></div><div class="reading-stats"><div><strong>${esc(a.active_days??'—')}</strong><span>阅读天数 / 7 天</span></div><div><strong>${esc(a.avg_minutes??'—')}</strong><span>日均阅读分钟</span></div><div><strong>${esc(a.total_minutes??'—')}</strong><span>累计阅读分钟</span></div></div><div class="reading-chart" aria-label="营期末七天每日阅读时长">${chart}</div>${a.missing?'<p class="insight-note">部分阅读数据缺失，活跃度暂不判断。</p>':''}</section></div>
+    <div class="profile-detail-side"><section class="insight-card"><span class="eyebrow">INTENT SIGNALS</span><h4>意向与对话信号</h4><div class="intent-level">${esc(intent.level||'待识别')}<small>意向等级</small></div><p>${intent.signals?.length?'近期信号：'+esc(intent.signals.map(s=>s.type).join('、')):'暂无可确认的意向信号'}</p>${intent.pending_messages?'<p class="insight-note">有消息待识别，结果可能更新。</p>':''}<small>基于近期家长对话中的不同意向信号</small></section>
+    <section class="insight-card"><div class="insight-title"><div><span class="eyebrow">MANUAL TAGS</span><h4>人工标签</h4></div><button class="subtle" data-add-tag="${esc(p.user_id)}">＋ 添加</button></div><div class="profile-tags">${tags||'<span class="muted">暂无标签</span>'}</div></section>
+    <section class="insight-card"><span class="eyebrow">MORE DETAILS</span><h4>更多行为</h4><dl class="profile-facts"><div><dt>测字</dt><dd>${esc(p.tested??'暂无')}</dd></div><div><dt>测字结果</dt><dd>${esc(p.test_result??'暂无')}</dd></div><div><dt>会员链接点击</dt><dd>${esc(p.member_link_clicks??'暂无')}</dd></div><div><dt>报名</dt><dd>${esc(p.signup??'暂无')}</dd></div></dl></section></div></div></article>`;
+  }
+  root.innerHTML=`<div class="profiles-layout"><aside class="panel profiles-list"><div class="profiles-list-head"><div><span class="eyebrow">PARENTS</span><h3>家长列表</h3></div><span class="profiles-count">${profiles.length} 位</span></div><div class="profile-filters">${filter('all','全部',profiles.length)}${filter('high','高意向',profiles.filter(high).length)}${filter('low','低活跃',profiles.filter(low).length)}</div><p class="filter-note">低活跃依据营期末七天阅读记录</p><div class="profile-people">${list||'<div class="empty">暂无用户</div>'}</div></aside>${detail}</div>`;
+  root.querySelectorAll('[data-profile-filter]').forEach(b=>b.onclick=()=>{profileFilter=b.dataset.profileFilter;renderProfiles()});
+  root.querySelectorAll('[data-select-profile]').forEach(b=>b.onclick=()=>{selectedProfile=b.dataset.selectProfile;renderProfiles()});
+  root.querySelector('[data-profile-chat]')?.addEventListener('click',e=>openUser(e.currentTarget.dataset.profileChat));
+  bindProfileButtons(root);
+}
+$('#refresh-profiles').onclick=loadDashboard;
 setInterval(()=>{if(state.token&&state.page==='chat'&&!document.hidden)refreshMessages()},2500);
 if(state.token)api('/api/v1/me').then(start).catch(()=>{sessionStorage.removeItem('opsie.token');state.token=null});
