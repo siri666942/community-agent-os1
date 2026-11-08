@@ -9,6 +9,20 @@
 **合规的每日运营包、家长应答工单、升级处置建议、家长分层跟进、成交交付、经营周报**出,
 中间是双 Agent 编制 + COO 编排 + 9 道人工闸门 + 全量留痕。
 
+## 📋 提交材料导览(评委入口)
+
+| 赛题要求 | 文档 | 一句话 |
+|---|---|---|
+| ① 项目介绍页 | [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) | 定位/目标用户/三档定价,30 秒看懂 |
+| ⑤ Agent 组织架构图 | [docs/AGENT_ORG.md](docs/AGENT_ORG.md) | 双 Agent 编制、协作闭环、9 道闸门决策权 |
+| ⑥ 营业日志与经营流水 | [docs/BUSINESS_LOG.md](docs/BUSINESS_LOG.md) | 40+ 小时 170 条动作日志(含真实打回/故障/修复) |
+| ⑦ 首单成交证明 | [docs/FIRST_ORDER.md](docs/FIRST_ORDER.md) | 报价→合同→收款→交付全链路(模拟交易) |
+| ⑧ 成本与商业化分析 | [docs/COST_ANALYSIS.md](docs/COST_ANALYSIS.md) | 77 次调用实测 token 成本 vs 人力对比 |
+| 代码仓库 | 本仓库 | commit 记录与运行时间线可互相印证 |
+| 产品对接契约 | [docs/API.md](docs/API.md) · [docs/WEB_CHAT_INTEGRATION.md](docs/WEB_CHAT_INTEGRATION.md) | Agent Service RESTful 12 端点 |
+
+> 真实家长群聊语料与含昵称名单数据不入库(脱敏);日志/工单中的家长问题以类型化摘要呈现。
+
 ## 双 Agent 编制
 
 | Agent | 职责(任务模式) | 对应闸门 |
