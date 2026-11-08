@@ -15,7 +15,11 @@ FOLLOWUP_ACTIONS = {
 
 
 def daily_list(limit: int = 50, uid_filter: str | None = None) -> dict:
-    """今日跟进名单:确定性分层 + 每层专属话术。只出名单,不产生触达。"""
+    """今日跟进名单:确定性分层 + 每层专属话术。只出名单,不产生触达。
+
+    对话回流:家长消息(含运营助手会话留痕)计入意向信号,
+    协作闭环「助手发送留痕 → 分析师名单刷新」在此生效。
+    """
     repo = repository.get_repository()
     if uid_filter:
         customers = [c for c in [repo.get_customer(uid_filter)] if c]
@@ -24,10 +28,11 @@ def daily_list(limit: int = 50, uid_filter: str | None = None) -> dict:
         total = repo.count_customers()
         # 扫描面大于返回面:S1 高价值用户稀少(约千分之二),批处理扫 5000 行采样
         customers = repo.list_customers(limit=max(limit * 50, 5000))
+    msgs_map = repo.parent_texts_by_uid()  # 对话信号回流:uid → 家长消息
 
     buckets: dict[str, list] = {"S1": [], "S2": [], "S3": []}
     for c in customers:
-        prof = profile_mod.build_profile(c, recent_messages=None)
+        prof = profile_mod.build_profile(c, recent_messages=msgs_map.get(c["uid"]))
         buckets[prof["tier"]].append({
             "uid": c["uid"], "nickname": prof["nickname"],
             "activity": prof["activity"]["level"], "intent": prof["intent"]["level"],
@@ -67,8 +72,9 @@ def _script_for(tier: str, examples: list[dict]) -> str:
 def segment_report() -> dict:
     """工作台分层分布(全量确定性统计,不拉明细)。"""
     repo = repository.get_repository()
+    msgs_map = repo.parent_texts_by_uid()
     counts = {"S1": 0, "S2": 0, "S3": 0}
     for c in repo.list_customers(limit=200):
-        prof = profile_mod.build_profile(c)
+        prof = profile_mod.build_profile(c, recent_messages=msgs_map.get(c["uid"]))
         counts[prof["tier"]] += 1
     return {"distribution": counts, "sampled": min(repo.count_customers(), 200)}

@@ -56,8 +56,9 @@ class Handler(BaseHTTPRequestHandler):
                 uid = path.rsplit("/", 1)[1]
                 self._profile(uid)
             elif path == "/api/v1/growth/daily":
-                limit = int(self._query().get("limit", 50))
-                _json(self, 200, analyst.daily_list(limit=limit))
+                q = self._query()
+                _json(self, 200, analyst.daily_list(
+                    limit=int(q.get("limit", 50)), uid_filter=q.get("uid") or None))
             elif path == "/api/v1/growth/report":
                 _json(self, 200, analyst.segment_report())
             elif path == "/api/v1/sop/board":

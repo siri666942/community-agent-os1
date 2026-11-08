@@ -95,6 +95,78 @@ def show_drafts(data):
             print(f"      ⚠ 风险:{r['type']}({r['level']})「{r['matched']}」→ {r['suggestion']}")
 
 
+def collab_loop():
+    """双 Agent 协作闭环:分析师圈人 → 助手出稿 → 留痕回流 → 名单刷新。"""
+    print(f"{'=' * 62}")
+    print("🤝 双 Agent 协作闭环:增值分析师 ⇄ 运营助手")
+    print(f"{'=' * 62}")
+
+    # 第 1 步:增值分析师出今日名单,圈定跟进目标
+    # (优先挑「高活跃但意向未满」的 S2 → 对话推进后可演示升层 S1)
+    st, g = agent("/api/v1/growth/daily?limit=20")
+    print("\n【第 1 步 · 增值分析师】出今日跟进名单:")
+    for s in g["segments"]:
+        who = "、".join(x["nickname"] for x in s["customers"][:3]) or "—"
+        print(f"   {s['tier']} {s['name']}(示例 {s['count']} 人):{who}")
+
+    target, from_tier = None, ""
+    for s in g["segments"]:
+        for x in s["customers"]:
+            if x["activity"] == "高" and x["intent"] != "高":
+                target, from_tier = x, s["tier"]
+                break
+        if target:
+            break
+    if not target:  # 退回 S1 首位,演示证据刷新
+        for s in g["segments"]:
+            if s["customers"]:
+                target, from_tier = s["customers"][0], s["tier"]
+                break
+    if not target:
+        print("   (名单为空,跳过协作演示)")
+        return
+    uid, nick = target["uid"], target["nickname"]
+    print(f"\n   👉 圈定目标:{nick}(uid={uid} · 当前 {from_tier})")
+    print(f"      圈人依据:{target['evidence']['activity']}")
+    print(f"                {target['evidence']['intent']}")
+
+    # 第 2 步:目标家长发来推进消息(问价 + 约试听 = 2 项推进信号)
+    msg = "想问下价格怎么样，另外能约个试听吗？"
+    print(f"\n【第 2 步 · 家长】{msg}")
+
+    # 第 3 步:运营助手基于分析师圈定的画像出三备选
+    st, data = agent("/api/v1/drafts", {"uid": uid, "message": msg})
+    print(f"\n【第 3 步 · 运营助手】基于圈定用户出三备选(分层 {data['customer_snapshot']['tier']})")
+    show_drafts(data)
+
+    # 第 4 步:老师选用 B 发送留痕(消息入库,供回流)
+    pick = next(d for d in data["drafts"] if d["variant"] == "B")
+    final = pick["text"]
+    if pick["qc"]["status"] == "yellow":
+        final += "（以上信息以官方说明为准）"
+    st, sent = agent("/api/v1/send", {
+        "cid": data["cid"], "text": final, "variant": "B",
+        "edited": final != pick["text"], "confirmed": True, "sender": "模拟老师"})
+    print(f"\n【第 4 步 · 老师】发送留痕 → 闸门 {sent['gate']['qc_status']}"
+          f" · {sent['gate']['message_id']}")
+
+    # 第 5 步:回流验证 —— 分析师名单刷新,对话信号已计入意向
+    st, g2 = agent(f"/api/v1/growth/daily?limit=20&uid={uid}")
+    entry = next((x for s in g2["segments"] for x in s["customers"] if x["uid"] == uid), None)
+    print("\n【第 5 步 · 回流验证】增值分析师名单刷新:")
+    if entry:
+        new_tier = next(s["tier"] for s in g2["segments"]
+                        for x in s["customers"] if x["uid"] == uid)
+        arrow = f"{from_tier} → {new_tier}" if new_tier != from_tier else f"{new_tier} 维持"
+        print(f"   分层:{arrow}")
+        print(f"   意向证据:{entry['evidence']['intent']}")
+        print(f"   活跃证据:{entry['evidence']['activity']}")
+        if new_tier != from_tier:
+            action = next(s["action"] for s in g2["segments"] if s["tier"] == new_tier)
+            print(f"   建议动作已切换:{action}")
+    print("\n   🏁 闭环完成:分析师圈人 → 助手出稿 → 人工发送留痕 → 对话回流刷新分层")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--uid", help="指定家长 uid")
@@ -178,12 +250,7 @@ def main():
             print(f"   概括:{prof['summary']}")
             print()
 
-        print(f"{'=' * 62}")
-        st, g = agent("/api/v1/growth/daily?limit=20")
-        print("📈 增值分析师 · 今日跟进名单(节选)")
-        for s in g["segments"]:
-            who = "、".join(x["nickname"] for x in s["customers"][:3]) or "—"
-            print(f"   {s['tier']} {s['name']}(示例 {s['count']} 人):{who}")
+        collab_loop()
         print(f"\n🏁 联调完成:web_api 代理 → Agent Service → {total} 位真实用户数据,链路全部打通")
         print("=" * 62)
     finally:

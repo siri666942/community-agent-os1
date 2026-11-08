@@ -112,6 +112,9 @@ class Repository(ABC):
     def list_cids_by_uid(self, uid: str) -> list[str]: ...
 
     @abstractmethod
+    def parent_texts_by_uid(self) -> dict[str, list[str]]: ...
+
+    @abstractmethod
     def upsert_sop_state(self, uid: str, state: dict) -> None: ...
 
     @abstractmethod
@@ -208,6 +211,17 @@ class SQLiteRepository(Repository):
         rows = self.con.execute(
             "SELECT cid FROM conversations WHERE uid=?", (uid,)).fetchall()
         return [r[0] for r in rows]
+
+    def parent_texts_by_uid(self) -> dict[str, list[str]]:
+        """全部家长消息按 uid 聚合(单次 JOIN 查询,供名单批处理读对话信号)。"""
+        rows = self.con.execute(
+            "SELECT co.uid, m.text FROM messages m"
+            " JOIN conversations co ON co.cid = m.cid"
+            " WHERE m.role='parent' ORDER BY m.created_at, m.rowid").fetchall()
+        out: dict[str, list[str]] = {}
+        for r in rows:
+            out.setdefault(r[0], []).append(r[1])
+        return out
 
     def upsert_sop_state(self, uid: str, state: dict) -> None:
         self.con.execute(
